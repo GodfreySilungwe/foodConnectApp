@@ -1,17 +1,27 @@
 const express = require('express');
-const app = express();
-const PORT = process.env.PORT || 3001;
 
-app.use(express.json());
+const createApp = () => {
+  const app = express();
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'foodconnect-backend' });
-});
+  app.use(express.json());
 
-app.get('/api', (req, res) => {
-  res.json({ message: 'FoodConnect API is running.' });
-});
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'foodconnect-backend' });
+  });
 
-app.listen(PORT, () => {
-  console.log(`FoodConnect backend listening on port ${PORT}`);
-});
+  app.get('/api', (req, res) => {
+    res.json({ message: 'FoodConnect API is running.' });
+  });
+
+  return app;
+};
+
+if (require.main === module) {
+  const app = createApp();
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`FoodConnect backend listening on port ${PORT}`);
+  });
+}
+
+module.exports = createApp();
