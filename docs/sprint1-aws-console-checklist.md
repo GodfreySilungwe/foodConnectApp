@@ -346,3 +346,42 @@ After completing these steps, proceed to Sprint 2 with a clean foundation:
 - order status updates.
 
 The Sprint 1 setup is complete only when the backend is deployed on AWS ECS Fargate and visible through the ALB health endpoint.
+
+---
+
+## 17. Run the Full Stack Locally with Docker Desktop
+
+From the repository root, make sure Docker Desktop is running and execute:
+
+```bash
+docker compose up --build
+```
+
+Open the frontend at `http://localhost:3000`. The local ports are:
+
+| Component | Port | Health endpoint |
+| --- | ---: | --- |
+| Backend foundation | 3001 | `/health` |
+| Identity service | 3002 | `/health` |
+| Provider service | 3003 | `/health` |
+| Order service | 3004 | `/health` |
+| Frontend | 3000 | `/` |
+
+To stop the stack:
+
+```bash
+docker compose down
+```
+
+The frontend uses `NEXT_PUBLIC_IDENTITY_API_URL`, `NEXT_PUBLIC_PROVIDER_API_URL`, and `NEXT_PUBLIC_ORDER_API_URL`. For AWS, set these values to the public API Gateway or ALB URLs and set `FRONTEND_ORIGIN` to the deployed frontend origin.
+
+## 18. Create ECR Repositories for Sprint 2 Services
+
+Create private repositories using these names:
+
+- `foodconnect-dev-identity`
+- `foodconnect-dev-provider`
+- `foodconnect-dev-order`
+- `foodconnect-dev-frontend`
+
+Create one ECS task definition and ECS service per container. Each service should use its matching container port (`3002`, `3003`, `3004`, or `3000`) and expose `/health` as its target group health check. Keep the frontend public behind the ALB and keep the feature services private behind an API gateway or internal routing layer in the next deployment iteration.
