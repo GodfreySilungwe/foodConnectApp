@@ -13,6 +13,14 @@ class MemoryRepository {
     return this.items.filter((item) => item.providerId === providerId);
   }
 
+  async findByOwnerUserId(userId) {
+    return this.items.find((item) => item.ownerUserId === userId);
+  }
+
+  async findById(id) {
+    return this.items.find((item) => item.id === id);
+  }
+
   async save(item) {
     this.items.push(item);
     return item;
@@ -37,6 +45,16 @@ class DynamoRepository {
   async listByProvider(providerId) {
     const items = await this.list();
     return items.filter((item) => item.providerId === providerId);
+  }
+
+  async findByOwnerUserId(userId) {
+    const items = await this.list();
+    return items.find((item) => item.ownerUserId === userId);
+  }
+
+  async findById(id) {
+    const items = await this.list();
+    return items.find((item) => item.id === id);
   }
 
   async save(item) {

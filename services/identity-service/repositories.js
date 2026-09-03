@@ -22,9 +22,11 @@ class MemoryUserRepository {
 class DynamoUserRepository {
   async list() {
     const storedUsers = await dynamo.listUsers();
-    if (storedUsers.length === 0) {
-      await Promise.all(this.seedUsers.map((user) => dynamo.saveUser(user)));
-      return this.seedUsers;
+    const storedIds = new Set(storedUsers.map((user) => user.id));
+    const missingUsers = this.seedUsers.filter((user) => !storedIds.has(user.id));
+    if (missingUsers.length > 0) {
+      await Promise.all(missingUsers.map((user) => dynamo.saveUser(user)));
+      return [...storedUsers, ...missingUsers];
     }
     return storedUsers;
   }

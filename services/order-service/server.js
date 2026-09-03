@@ -2,6 +2,15 @@ const express = require('express');
 const { createOrderRepository } = require('./repositories');
 const { requireAuth } = require('./auth');
 
+const allowedTransitions = {
+  pending: ['accepted', 'cancelled'],
+  accepted: ['preparing', 'cancelled'],
+  preparing: ['ready'],
+  ready: ['completed'],
+  completed: [],
+  cancelled: []
+};
+
 const createApp = () => {
   const app = express();
   app.use((req, res, next) => {
@@ -28,14 +37,36 @@ const createApp = () => {
   });
 
   app.get('/api/orders', requireAuth(), async (req, res) => {
-    const filteredOrders = req.query.customerId
-      ? await orderRepository.listByCustomer(req.query.customerId)
-      : await orderRepository.list();
+    const filteredOrders = req.user.role === 'admin'
+      ? await orderRepository.list()
+      : req.user.role === 'provider'
+      ? await orderRepository.listByProvider(req.user.providerId)
+      : req.user.role === 'customer'
+      ? await orderRepository.listByCustomer(req.user.userId)
+      : [];
     res.json({ success: true, data: filteredOrders });
   });
 
+  app.patch('/api/orders/:orderId/status', requireAuth('provider'), async (req, res) => {
+    const { status } = req.body || {};
+    if (!req.user.providerId) {
+      return res.status(403).json({ success: false, error: 'Provider account is not linked to a provider' });
+    }
+
+    const orders = await orderRepository.listByProvider(req.user.providerId);
+    const order = orders.find((entry) => entry.id === req.params.orderId);
+
+    if (!status || !order || !allowedTransitions[order.status]?.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid order status transition' });
+    }
+
+    const updatedOrder = await orderRepository.updateStatus(order.id, status);
+    return res.json({ success: true, data: updatedOrder, message: 'Order status updated successfully' });
+  });
+
   app.post('/api/orders', requireAuth('customer'), async (req, res) => {
-    const { customerId, providerId, items, scheduledFor, deliveryType } = req.body || {};
+    const { providerId, items, scheduledFor, deliveryType } = req.body || {};
+    const customerId = req.user.userId;
 
     if (!customerId || !providerId || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({

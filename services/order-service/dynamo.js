@@ -1,5 +1,5 @@
 const { DynamoDBClient, CreateTableCommand, DescribeTableCommand } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, ScanCommand, PutCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 const enabled = process.env.USE_DYNAMODB === 'true';
 const tableName = process.env.ORDERS_TABLE || 'foodconnect-dev-orders';
@@ -29,4 +29,20 @@ async function saveOrder(order) {
   }
 }
 
-module.exports = { enabled, listOrders, saveOrder };
+async function updateOrderStatus(orderId, status) {
+  if (enabled) {
+    await ensureTable();
+    const result = await client.send(new UpdateCommand({
+      TableName: tableName,
+      Key: { id: orderId },
+      UpdateExpression: 'SET #status = :status',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':status': status },
+      ReturnValues: 'ALL_NEW'
+    }));
+    return result.Attributes;
+  }
+  return null;
+}
+
+module.exports = { enabled, listOrders, saveOrder, updateOrderStatus };

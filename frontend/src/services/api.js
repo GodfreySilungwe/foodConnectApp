@@ -49,5 +49,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(order)
   }, token),
-  getOrders: (customerId, token) => request(`${urls.order}/api/orders?customerId=${encodeURIComponent(customerId)}`, {}, token)
+  getOrders: (customerId, token) => request(`${urls.order}/api/orders?customerId=${encodeURIComponent(customerId)}`, {}, token),
+  getProviderOrders: (token) => request(`${urls.order}/api/orders?providerId=me`, {}, token),
+  updateOrderStatus: (orderId, status, token) => request(`${urls.order}/api/orders/${orderId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status })
+  }, token)
 };

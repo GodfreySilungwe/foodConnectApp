@@ -61,6 +61,10 @@ Response:
 }
 ```
 
+#### GET /api/admin/users
+
+Requires an admin JWT. Returns user profiles without password hashes.
+
 ---
 
 ## Provider Service
@@ -126,6 +130,26 @@ Response:
 ---
 
 ## Order Service
+
+### View Incoming Orders
+
+`GET /api/orders?providerId=me`
+
+Requires a provider JWT. The service ignores caller-supplied provider IDs and filters by the provider ID embedded in the verified token.
+
+### Update Order Status
+
+`PATCH /api/orders/{orderId}/status`
+
+Request body:
+
+```json
+{
+  "status": "accepted"
+}
+```
+
+Allowed transitions are `pending -> accepted|cancelled`, `accepted -> preparing|cancelled`, `preparing -> ready`, and `ready -> completed`.
 
 ### Base URL
 `http://localhost:3004`

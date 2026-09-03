@@ -13,8 +13,19 @@ class MemoryOrderRepository {
     return this.orders.filter((order) => order.customerId === customerId);
   }
 
+  async listByProvider(providerId) {
+    return this.orders.filter((order) => order.providerId === providerId);
+  }
+
   async save(order) {
     this.orders.push(order);
+    return order;
+  }
+
+  async updateStatus(orderId, status) {
+    const order = this.orders.find((entry) => entry.id === orderId);
+    if (!order) return null;
+    order.status = status;
     return order;
   }
 }
@@ -38,9 +49,18 @@ class DynamoOrderRepository {
     return orders.filter((order) => order.customerId === customerId);
   }
 
+  async listByProvider(providerId) {
+    const orders = await this.list();
+    return orders.filter((order) => order.providerId === providerId);
+  }
+
   async save(order) {
     await dynamo.saveOrder(order);
     return order;
+  }
+
+  async updateStatus(orderId, status) {
+    return dynamo.updateOrderStatus(orderId, status);
   }
 }
 

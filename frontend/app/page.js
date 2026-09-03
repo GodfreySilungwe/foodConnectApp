@@ -22,6 +22,7 @@ export default function HomePage() {
   const [message, setMessage] = useState('');
   const [session, setSession] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [incomingOrders, setIncomingOrders] = useState([]);
 
   const refreshProviders = () => api.getProviders().then((result) => setProviders(result.data || []));
 
@@ -36,6 +37,12 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!session?.user?.userId || !session.token) return;
+    if (session.user.role === 'provider') {
+      api.getProviderOrders(session.token)
+        .then((result) => setIncomingOrders(result.data || []))
+        .catch((error) => setMessage(error.message));
+      return;
+    }
     setOrder((current) => ({ ...current, customerId: session.user.userId }));
     api.getOrders(session.user.userId, session.token)
       .then((result) => setOrders(result.data || []))
@@ -61,8 +68,13 @@ export default function HomePage() {
       setMessage(successMessage);
       await refreshProviders();
       if (session?.user?.userId && session.token) {
-        const result = await api.getOrders(session.user.userId, session.token);
-        setOrders(result.data || []);
+        if (session.user.role === 'provider') {
+          const result = await api.getProviderOrders(session.token);
+          setIncomingOrders(result.data || []);
+        } else {
+          const result = await api.getOrders(session.user.userId, session.token);
+          setOrders(result.data || []);
+        }
       }
     } catch (error) {
       setMessage(error.message);
@@ -99,6 +111,7 @@ export default function HomePage() {
     window.localStorage.removeItem('foodconnect-session');
     setSession(null);
     setOrders([]);
+    setIncomingOrders([]);
     setMessage('You have been signed out.');
   };
 
@@ -129,14 +142,14 @@ export default function HomePage() {
         <article style={styles.panel}>
           <h2>Providers</h2>
           <div style={styles.providerList}>{providers.map((item) => <div key={item.id} style={styles.provider}><strong>{item.name}</strong><span>{item.status}</span></div>)}{providers.length === 0 && <p>No providers available.</p>}</div>
-          <ActionForm onSubmit={(event) => { event.preventDefault(); submit(() => api.registerProvider(provider, session?.token), 'Provider registered.'); }}>
+          {session?.user?.role === 'provider' && <ActionForm onSubmit={(event) => { event.preventDefault(); submit(() => api.registerProvider(provider, session?.token), 'Provider registered.'); }}>
             <input style={inputStyle} aria-label="Provider name" placeholder="Provider name" value={provider.name} onChange={(event) => setProvider({ ...provider, name: event.target.value })} required />
             <input style={inputStyle} aria-label="Owner name" placeholder="Owner name" value={provider.ownerName} onChange={(event) => setProvider({ ...provider, ownerName: event.target.value })} required />
             <input style={inputStyle} aria-label="Provider email" placeholder="Email" type="email" value={provider.email} onChange={(event) => setProvider({ ...provider, email: event.target.value })} required />
             <button type="submit">Register provider</button>
-          </ActionForm>
+          </ActionForm>}
         </article>
-        <article style={styles.panel}>
+        {session?.user?.role === 'provider' && <article style={styles.panel}>
           <h2>Publish menu item</h2>
           <ActionForm onSubmit={(event) => { event.preventDefault(); submit(() => api.createMenuItem(menu.providerId, { name: menu.name, price: Number(menu.price) }, session?.token), 'Menu item created.'); }}>
             <input style={inputStyle} aria-label="Provider ID" placeholder="Provider ID" value={menu.providerId} onChange={(event) => setMenu({ ...menu, providerId: event.target.value })} required />
@@ -144,8 +157,8 @@ export default function HomePage() {
             <input style={inputStyle} aria-label="Menu item price" placeholder="Price" type="number" min="0" step="0.01" value={menu.price} onChange={(event) => setMenu({ ...menu, price: event.target.value })} required />
             <button type="submit">Create menu item</button>
           </ActionForm>
-        </article>
-        <article style={styles.panel}>
+        </article>}
+        {session?.user?.role === 'customer' && <article style={styles.panel}>
           <h2>Place order</h2>
           <ActionForm onSubmit={(event) => { event.preventDefault(); submit(() => api.createOrder({ customerId: session.user.userId, providerId: order.providerId, items: [{ menuId: order.menuId, quantity: Number(order.quantity), price: Number(order.price) }], deliveryType: 'collection' }, session?.token), 'Order created.'); }}>
             <input style={inputStyle} aria-label="Customer ID" placeholder="Sign in to order" value={session?.user?.userId || ''} readOnly required />
@@ -155,13 +168,18 @@ export default function HomePage() {
             {catalog.length === 0 && <p style={styles.helper}>This provider has no available menu items yet.</p>}
             <button type="submit" disabled={!session || session.user.role !== 'customer' || catalog.length === 0}>Create order</button>
           </ActionForm>
-        </article>
-        <article style={styles.panel}>
+        </article>}
+        {session?.user?.role === 'customer' && <article style={styles.panel}>
           <h2>Order history</h2>
           {!session && <p style={styles.helper}>Sign in to view your orders.</p>}
           {session && orders.length === 0 && <p style={styles.helper}>No orders yet.</p>}
           {orders.map((item) => <div key={item.id} style={styles.order}><strong>{item.id}</strong><span>{item.status}</span><b>${Number(item.total).toFixed(2)}</b></div>)}
-        </article>
+        </article>}
+        {session?.user?.role === 'provider' && <article style={styles.panel}>
+          <h2>Incoming orders</h2>
+          {incomingOrders.length === 0 && <p style={styles.helper}>No incoming orders.</p>}
+          {incomingOrders.map((item) => <ProviderOrder key={item.id} order={item} token={session.token} onUpdate={(updated) => setIncomingOrders((current) => current.map((entry) => entry.id === updated.id ? updated : entry))} setMessage={setMessage} />)}
+        </article>}
       </section>
     </main>
   );
@@ -183,5 +201,22 @@ const styles = {
   provider: { display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #e7e2d8' },
   helper: { color: '#6d746f', font: '13px/1.4 Arial, sans-serif' },
   order: { display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px', padding: '12px 0', borderBottom: '1px solid #e7e2d8', font: '14px Arial, sans-serif' },
+  incomingOrder: { padding: '4px 0 14px' },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }
 };
+
+function ProviderOrder({ order, token, onUpdate, setMessage }) {
+  const nextStatus = { pending: 'accepted', accepted: 'preparing', preparing: 'ready', ready: 'completed' }[order.status];
+
+  const updateStatus = async () => {
+    try {
+      const result = await api.updateOrderStatus(order.id, nextStatus, token);
+      onUpdate(result.data);
+      setMessage(`Order ${order.id} marked ${nextStatus}.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
+  return <div style={styles.incomingOrder}><div style={styles.order}><strong>{order.id}</strong><span>{order.status}</span><b>${Number(order.total).toFixed(2)}</b></div>{nextStatus && <button type="button" onClick={updateStatus}>Mark {nextStatus}</button>}</div>;
+}

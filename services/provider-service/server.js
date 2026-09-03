@@ -19,7 +19,8 @@ const createApp = () => {
       name: 'Sunrise Kitchen',
       ownerName: 'Alice',
       email: 'sunrise@example.com',
-      status: 'active'
+      status: 'active',
+      ownerUserId: 'u-002'
     }
   ]);
 
@@ -40,8 +41,16 @@ const createApp = () => {
     return res.json({ success: true, data: items });
   });
 
+  app.get('/api/admin/providers', requireAuth('admin'), async (req, res) => {
+    res.json({ success: true, data: await providerRepository.list() });
+  });
+
   app.post('/api/providers', requireAuth('provider'), async (req, res) => {
     const { name, ownerName, email, status } = req.body || {};
+
+    if (await providerRepository.findByOwnerUserId(req.user.userId) || await providerRepository.findById(req.user.providerId)) {
+      return res.status(409).json({ success: false, error: 'Provider account may register only one provider' });
+    }
 
     if (!name || !ownerName || !email) {
       return res.status(400).json({
@@ -52,11 +61,12 @@ const createApp = () => {
     }
 
     const newProvider = {
-      id: `p-${Date.now()}`,
+      id: req.user.providerId || `p-${Date.now()}`,
       name,
       ownerName,
       email,
-      status: status || 'active'
+      status: status || 'active',
+      ownerUserId: req.user.userId
     };
 
     await providerRepository.save(newProvider);
@@ -78,6 +88,12 @@ const createApp = () => {
         error: 'Validation failed',
         details: ['name and numeric price are required']
       });
+    }
+
+    const owner = await providerRepository.findByOwnerUserId(req.user.userId);
+    const ownsLegacyProvider = req.user.providerId === providerId;
+    if (!owner || owner.id !== providerId || (owner.ownerUserId !== req.user.userId && !ownsLegacyProvider)) {
+      return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
     }
 
     const newItem = {

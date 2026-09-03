@@ -2,6 +2,7 @@ const express = require('express');
 const { createUserRepository } = require('./repositories');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { requireAuth } = require('./auth');
 
 const jwtSecret = process.env.JWT_SECRET || 'foodconnect-development-secret';
 
@@ -19,20 +20,27 @@ const createApp = () => {
 
   const userRepository = createUserRepository([
     { id: 'u-001', name: 'Demo Customer', email: 'customer@example.com', passwordHash: bcrypt.hashSync('123456', 10), role: 'customer' },
-    { id: 'u-002', name: 'Demo Provider', email: 'provider@example.com', passwordHash: bcrypt.hashSync('123456', 10), role: 'provider' }
+    { id: 'u-002', name: 'Demo Provider', email: 'provider@example.com', passwordHash: bcrypt.hashSync('123456', 10), role: 'provider', providerId: 'p-001' },
+    { id: 'u-003', name: 'Demo Admin', email: 'admin@example.com', passwordHash: bcrypt.hashSync('123456', 10), role: 'admin' }
   ]);
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'identity-service' });
   });
 
-  app.get('/api/users', async (req, res) => {
-    res.json({ users: await userRepository.list() });
+  app.get('/api/users', requireAuth('admin'), async (req, res) => {
+    const users = await userRepository.list();
+    res.json({ users: users.map(({ password, passwordHash, ...user }) => user) });
+  });
+
+  app.get('/api/admin/users', requireAuth('admin'), async (req, res) => {
+    const users = await userRepository.list();
+    res.json({ success: true, data: users.map(({ password, passwordHash, ...user }) => user) });
   });
 
   app.post('/api/auth/register', async (req, res) => {
     const { name, email, password, role } = req.body || {};
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !password || !['customer', 'provider'].includes(role)) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
@@ -53,7 +61,8 @@ const createApp = () => {
       name,
       email,
       passwordHash: await bcrypt.hash(password, 10),
-      role
+      role,
+      ...(role === 'provider' ? { providerId: `p-${Date.now()}` } : {})
     };
 
     await userRepository.save(newUser);
@@ -64,7 +73,8 @@ const createApp = () => {
         userId: newUser.id,
         name: newUser.name,
         email: newUser.email,
-        role: newUser.role
+        role: newUser.role,
+        ...(newUser.providerId ? { providerId: newUser.providerId } : {})
       },
       message: 'User registered successfully'
     });
@@ -96,12 +106,13 @@ const createApp = () => {
     return res.status(200).json({
       success: true,
       data: {
-        token: jwt.sign({ userId: user.id, role: user.role, email: user.email }, jwtSecret, { expiresIn: '2h' }),
+        token: jwt.sign({ userId: user.id, role: user.role, email: user.email, ...(user.providerId ? { providerId: user.providerId } : {}) }, jwtSecret, { expiresIn: '2h' }),
         user: {
           userId: user.id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          ...(user.providerId ? { providerId: user.providerId } : {})
         }
       },
       message: 'Login successful'
