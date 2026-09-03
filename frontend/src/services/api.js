@@ -12,9 +12,9 @@ const urls = {
   order: serviceUrl(process.env.NEXT_PUBLIC_ORDER_API_URL, 'http://localhost:3004')
 };
 
-async function request(url, options = {}) {
+async function request(url, options = {}, token) {
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
     ...options
   });
   const payload = await response.json().catch(() => ({}));
@@ -37,16 +37,17 @@ export const api = {
   }),
   getProviders: () => request(`${urls.provider}/api/providers`),
   getMenu: (providerId) => request(`${urls.provider}/api/providers/${providerId}/menu`),
-  registerProvider: (provider) => request(`${urls.provider}/api/providers`, {
+  registerProvider: (provider, token) => request(`${urls.provider}/api/providers`, {
     method: 'POST',
     body: JSON.stringify(provider)
-  }),
-  createMenuItem: (providerId, item) => request(`${urls.provider}/api/providers/${providerId}/menu`, {
+  }, token),
+  createMenuItem: (providerId, item, token) => request(`${urls.provider}/api/providers/${providerId}/menu`, {
     method: 'POST',
     body: JSON.stringify(item)
-  }),
-  createOrder: (order) => request(`${urls.order}/api/orders`, {
+  }, token),
+  createOrder: (order, token) => request(`${urls.order}/api/orders`, {
     method: 'POST',
     body: JSON.stringify(order)
-  })
+  }, token),
+  getOrders: (customerId, token) => request(`${urls.order}/api/orders?customerId=${encodeURIComponent(customerId)}`, {}, token)
 };

@@ -1,5 +1,9 @@
 const express = require('express');
 const { createUserRepository } = require('./repositories');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const jwtSecret = process.env.JWT_SECRET || 'foodconnect-development-secret';
 
 const createApp = () => {
   const app = express();
@@ -14,8 +18,8 @@ const createApp = () => {
   app.use(express.json());
 
   const userRepository = createUserRepository([
-    { id: 'u-001', name: 'Demo Customer', email: 'customer@example.com', password: '123456', role: 'customer' },
-    { id: 'u-002', name: 'Demo Provider', email: 'provider@example.com', password: '123456', role: 'provider' }
+    { id: 'u-001', name: 'Demo Customer', email: 'customer@example.com', passwordHash: bcrypt.hashSync('123456', 10), role: 'customer' },
+    { id: 'u-002', name: 'Demo Provider', email: 'provider@example.com', passwordHash: bcrypt.hashSync('123456', 10), role: 'provider' }
   ]);
 
   app.get('/health', (req, res) => {
@@ -48,7 +52,7 @@ const createApp = () => {
       id: `u-${Date.now()}`,
       name,
       email,
-      password,
+      passwordHash: await bcrypt.hash(password, 10),
       role
     };
 
@@ -78,7 +82,11 @@ const createApp = () => {
 
     const user = await userRepository.findByEmail(email);
 
-    if (!user || user.password !== password) {
+    const passwordMatches = user && user.passwordHash
+      ? await bcrypt.compare(password, user.passwordHash)
+      : user && user.password === password;
+
+    if (!passwordMatches) {
       return res.status(401).json({
         success: false,
         error: 'Invalid credentials'
@@ -88,7 +96,7 @@ const createApp = () => {
     return res.status(200).json({
       success: true,
       data: {
-        token: `mock-token-${user.id}`,
+        token: jwt.sign({ userId: user.id, role: user.role, email: user.email }, jwtSecret, { expiresIn: '2h' }),
         user: {
           userId: user.id,
           name: user.name,

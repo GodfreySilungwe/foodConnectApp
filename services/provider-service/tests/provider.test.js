@@ -1,10 +1,14 @@
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const app = require('../server');
+
+const providerToken = jwt.sign({ userId: 'u-002', role: 'provider' }, 'foodconnect-development-secret');
 
 describe('Provider service', () => {
   it('registers a provider', async () => {
     const response = await request(app)
       .post('/api/providers')
+      .set('Authorization', `Bearer ${providerToken}`)
       .send({
         name: 'Green Bowl',
         ownerName: 'Jane Doe',
@@ -20,6 +24,7 @@ describe('Provider service', () => {
   it('creates a menu item for a provider', async () => {
     const response = await request(app)
       .post('/api/providers/p-001/menu')
+      .set('Authorization', `Bearer ${providerToken}`)
       .send({
         name: 'Beef Burger',
         price: 18.5,

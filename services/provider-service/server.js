@@ -1,5 +1,6 @@
 const express = require('express');
 const { createRepository } = require('./repositories');
+const { requireAuth } = require('./auth');
 
 const createApp = () => {
   const app = express();
@@ -39,7 +40,7 @@ const createApp = () => {
     return res.json({ success: true, data: items });
   });
 
-  app.post('/api/providers', async (req, res) => {
+  app.post('/api/providers', requireAuth('provider'), async (req, res) => {
     const { name, ownerName, email, status } = req.body || {};
 
     if (!name || !ownerName || !email) {
@@ -67,7 +68,7 @@ const createApp = () => {
     });
   });
 
-  app.post('/api/providers/:providerId/menu', async (req, res) => {
+  app.post('/api/providers/:providerId/menu', requireAuth('provider'), async (req, res) => {
     const { providerId } = req.params;
     const { name, price, available } = req.body || {};
 

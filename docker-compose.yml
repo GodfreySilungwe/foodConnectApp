@@ -73,6 +73,7 @@ services:
       AWS_ACCESS_KEY_ID: fakeMyKeyId
       AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
       USERS_TABLE: foodconnect-dev-users
+      JWT_SECRET: foodconnect-development-secret
     depends_on:
       dynamodb-local:
         condition: service_healthy
@@ -95,6 +96,7 @@ services:
       PORT: 3003
       NODE_ENV: development
       USE_DYNAMODB: "true"
+      JWT_SECRET: foodconnect-development-secret
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
@@ -123,6 +125,7 @@ services:
       PORT: 3004
       NODE_ENV: development
       USE_DYNAMODB: "true"
+      JWT_SECRET: foodconnect-development-secret
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId

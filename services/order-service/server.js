@@ -1,5 +1,6 @@
 const express = require('express');
 const { createOrderRepository } = require('./repositories');
+const { requireAuth } = require('./auth');
 
 const createApp = () => {
   const app = express();
@@ -26,14 +27,14 @@ const createApp = () => {
     res.json({ status: 'ok', service: 'order-service' });
   });
 
-  app.get('/api/orders', async (req, res) => {
+  app.get('/api/orders', requireAuth(), async (req, res) => {
     const filteredOrders = req.query.customerId
       ? await orderRepository.listByCustomer(req.query.customerId)
       : await orderRepository.list();
     res.json({ success: true, data: filteredOrders });
   });
 
-  app.post('/api/orders', async (req, res) => {
+  app.post('/api/orders', requireAuth('customer'), async (req, res) => {
     const { customerId, providerId, items, scheduledFor, deliveryType } = req.body || {};
 
     if (!customerId || !providerId || !Array.isArray(items) || items.length === 0) {

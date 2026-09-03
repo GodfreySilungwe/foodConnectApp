@@ -100,6 +100,8 @@ This is implemented in the service-local `repositories.js` modules. Routes depen
 
 This keeps service logic independent from direct DynamoDB calls.
 
+Authentication is separated from route logic through reusable JWT middleware. The identity service hashes passwords with bcrypt and signs tokens at login. Provider mutations require the `provider` role, and order creation requires the `customer` role. The development secret is supplied by Compose; AWS deployments must provide a secret through a managed secret store rather than committing it to source control.
+
 ## 9. Strategy Pattern for AI/Analytics
 
 The forecasting logic can be implemented with interchangeable strategies:

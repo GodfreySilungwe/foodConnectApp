@@ -1,10 +1,14 @@
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const app = require('../server');
+
+const customerToken = jwt.sign({ userId: 'u-001', role: 'customer' }, 'foodconnect-development-secret');
 
 describe('Order service', () => {
   it('creates a new order', async () => {
     const response = await request(app)
       .post('/api/orders')
+      .set('Authorization', `Bearer ${customerToken}`)
       .send({
         customerId: 'u-001',
         providerId: 'p-001',
@@ -22,6 +26,7 @@ describe('Order service', () => {
   it('rejects order without required fields', async () => {
     const response = await request(app)
       .post('/api/orders')
+      .set('Authorization', `Bearer ${customerToken}`)
       .send({
         customerId: 'u-001'
       });
