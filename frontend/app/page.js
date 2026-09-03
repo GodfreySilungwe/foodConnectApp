@@ -12,6 +12,8 @@ function ActionForm({ children, onSubmit }) {
 
 export default function HomePage() {
   const [providers, setProviders] = useState([]);
+  const [catalog, setCatalog] = useState([]);
+  const [selectedProviderId, setSelectedProviderId] = useState('p-001');
   const [login, setLogin] = useState({ email: '', password: '' });
   const [provider, setProvider] = useState({ name: '', ownerName: '', email: '' });
   const [menu, setMenu] = useState({ providerId: 'p-001', name: '', price: '' });
@@ -23,6 +25,19 @@ export default function HomePage() {
   useEffect(() => {
     refreshProviders().catch((error) => setMessage(error.message));
   }, []);
+
+  useEffect(() => {
+    if (!selectedProviderId) return;
+    api.getMenu(selectedProviderId)
+      .then((result) => {
+        const items = (result.data || []).filter((item) => item.available);
+        setCatalog(items);
+        if (items.length > 0) {
+          setOrder((current) => ({ ...current, providerId: selectedProviderId, menuId: items[0].id, price: items[0].price }));
+        }
+      })
+      .catch((error) => setMessage(error.message));
+  }, [selectedProviderId]);
 
   const submit = async (action, successMessage) => {
     try {
@@ -73,9 +88,10 @@ export default function HomePage() {
           <h2>Place order</h2>
           <ActionForm onSubmit={(event) => { event.preventDefault(); submit(() => api.createOrder({ customerId: order.customerId, providerId: order.providerId, items: [{ menuId: order.menuId, quantity: Number(order.quantity), price: Number(order.price) }], deliveryType: 'collection' }), 'Order created.'); }}>
             <input style={inputStyle} aria-label="Customer ID" placeholder="Customer ID" value={order.customerId} onChange={(event) => setOrder({ ...order, customerId: event.target.value })} required />
-            <input style={inputStyle} aria-label="Order provider ID" placeholder="Provider ID" value={order.providerId} onChange={(event) => setOrder({ ...order, providerId: event.target.value })} required />
-            <input style={inputStyle} aria-label="Menu ID" placeholder="Menu ID" value={order.menuId} onChange={(event) => setOrder({ ...order, menuId: event.target.value })} required />
-            <div style={styles.row}><input style={inputStyle} aria-label="Quantity" type="number" min="1" value={order.quantity} onChange={(event) => setOrder({ ...order, quantity: event.target.value })} required /><input style={inputStyle} aria-label="Order price" type="number" min="0" step="0.01" value={order.price} onChange={(event) => setOrder({ ...order, price: event.target.value })} required /></div>
+            <select style={inputStyle} aria-label="Order provider" value={selectedProviderId} onChange={(event) => { setSelectedProviderId(event.target.value); setOrder({ ...order, providerId: event.target.value, menuId: '' }); }} required>{providers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+            <select style={inputStyle} aria-label="Menu item" value={order.menuId} onChange={(event) => { const item = catalog.find((entry) => entry.id === event.target.value); setOrder({ ...order, menuId: item.id, price: item.price }); }} required>{catalog.map((item) => <option key={item.id} value={item.id}>{item.name} - ${item.price.toFixed(2)}</option>)}</select>
+            <input style={inputStyle} aria-label="Quantity" type="number" min="1" value={order.quantity} onChange={(event) => setOrder({ ...order, quantity: event.target.value })} required />
+            {catalog.length === 0 && <p style={styles.helper}>This provider has no available menu items yet.</p>}
             <button type="submit">Create order</button>
           </ActionForm>
         </article>
@@ -96,5 +112,6 @@ const styles = {
   panel: { padding: '22px', background: '#fffdf8', border: '1px solid #d9d5cb', boxShadow: '5px 5px 0 #d9d5cb' },
   providerList: { marginBottom: '18px', font: '14px Arial, sans-serif' },
   provider: { display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #e7e2d8' },
+  helper: { color: '#6d746f', font: '13px/1.4 Arial, sans-serif' },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }
 };

@@ -8,6 +8,8 @@
     "test": "jest --runInBand"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1125.0",
+    "@aws-sdk/lib-dynamodb": "^3.1125.0",
     "express": "^4.19.2"
   },
   "devDependencies": {

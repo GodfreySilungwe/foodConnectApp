@@ -36,6 +36,7 @@ export const api = {
     body: JSON.stringify(user)
   }),
   getProviders: () => request(`${urls.provider}/api/providers`),
+  getMenu: (providerId) => request(`${urls.provider}/api/providers/${providerId}/menu`),
   registerProvider: (provider) => request(`${urls.provider}/api/providers`, {
     method: 'POST',
     body: JSON.stringify(provider)

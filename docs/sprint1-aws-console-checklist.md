@@ -375,6 +375,29 @@ docker compose down
 
 The frontend uses `NEXT_PUBLIC_IDENTITY_API_URL`, `NEXT_PUBLIC_PROVIDER_API_URL`, and `NEXT_PUBLIC_ORDER_API_URL`. For AWS, set these values to the public API Gateway or ALB URLs and set `FRONTEND_ORIGIN` to the deployed frontend origin.
 
+## 17.1 Use DynamoDB Local for Persistent Development Data
+
+Compose uses the Docker Hub image `amazon/dynamodb-local:latest` and stores its database files in the named volume `dynamodb-data`. The feature services are configured with `USE_DYNAMODB=true` and create these tables automatically on first access:
+
+- `foodconnect-dev-users`
+- `foodconnect-dev-providers`
+- `foodconnect-dev-menus`
+- `foodconnect-dev-orders`
+
+Start the database and services with:
+
+```bash
+docker compose up --build -d
+```
+
+The local DynamoDB endpoint is `http://localhost:8000`. Data remains after `docker compose down` and is removed only when the volume is explicitly deleted:
+
+```bash
+docker compose down -v
+```
+
+For AWS deployment, remove `DYNAMODB_ENDPOINT`, set `USE_DYNAMODB=true`, and use an IAM task role instead of local access keys. The table names can remain the same when the AWS region/account is configured.
+
 ## 18. Create ECR Repositories for Sprint 2 Services
 
 Create private repositories using these names:

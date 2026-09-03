@@ -91,6 +91,8 @@ This produces cleaner and more reliable code.
 
 The repository pattern is used to abstract persistence operations from business logic.
 
+This is implemented in the service-local `repositories.js` modules. Routes depend on contracts such as `findByEmail`, `listByProvider`, `listByCustomer`, `list`, and `save`, while repository factories select the in-memory implementation for tests or the DynamoDB implementation when `USE_DYNAMODB=true`. The DynamoDB client and table initialization remain inside the infrastructure adapters, so changing from DynamoDB Local to AWS DynamoDB does not change route behavior.
+
 ### Example
 - `UserRepository` handles user CRUD operations
 - `OrderRepository` handles order persistence and retrieval

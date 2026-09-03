@@ -1,4 +1,5 @@
 const express = require('express');
+const { createRepository } = require('./repositories');
 
 const createApp = () => {
   const app = express();
@@ -11,7 +12,7 @@ const createApp = () => {
   });
   app.use(express.json());
 
-  const providers = [
+  const providerRepository = createRepository(process.env.PROVIDERS_TABLE || 'foodconnect-dev-providers', [
     {
       id: 'p-001',
       name: 'Sunrise Kitchen',
@@ -19,21 +20,26 @@ const createApp = () => {
       email: 'sunrise@example.com',
       status: 'active'
     }
-  ];
+  ]);
 
-  const menuItems = [
+  const menuRepository = createRepository(process.env.MENUS_TABLE || 'foodconnect-dev-menus', [
     { id: 'm-101', providerId: 'p-001', name: 'Chicken Rice', price: 22.5, available: true }
-  ];
+  ]);
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'provider-service' });
   });
 
-  app.get('/api/providers', (req, res) => {
-    res.json({ success: true, data: providers });
+  app.get('/api/providers', async (req, res) => {
+    res.json({ success: true, data: await providerRepository.list() });
   });
 
-  app.post('/api/providers', (req, res) => {
+  app.get('/api/providers/:providerId/menu', async (req, res) => {
+    const items = await menuRepository.listByProvider(req.params.providerId);
+    return res.json({ success: true, data: items });
+  });
+
+  app.post('/api/providers', async (req, res) => {
     const { name, ownerName, email, status } = req.body || {};
 
     if (!name || !ownerName || !email) {
@@ -52,7 +58,7 @@ const createApp = () => {
       status: status || 'active'
     };
 
-    providers.push(newProvider);
+    await providerRepository.save(newProvider);
 
     return res.status(201).json({
       success: true,
@@ -61,7 +67,7 @@ const createApp = () => {
     });
   });
 
-  app.post('/api/providers/:providerId/menu', (req, res) => {
+  app.post('/api/providers/:providerId/menu', async (req, res) => {
     const { providerId } = req.params;
     const { name, price, available } = req.body || {};
 
@@ -81,7 +87,7 @@ const createApp = () => {
       available: available !== false
     };
 
-    menuItems.push(newItem);
+    await menuRepository.save(newItem);
 
     return res.status(201).json({
       success: true,

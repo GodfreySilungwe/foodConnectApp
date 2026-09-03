@@ -1,4 +1,5 @@
 const express = require('express');
+const { createOrderRepository } = require('./repositories');
 
 const createApp = () => {
   const app = express();
@@ -11,7 +12,7 @@ const createApp = () => {
   });
   app.use(express.json());
 
-  const orders = [
+  const orderRepository = createOrderRepository([
     {
       id: 'o-1001',
       customerId: 'u-001',
@@ -19,17 +20,20 @@ const createApp = () => {
       status: 'pending',
       total: 42.5
     }
-  ];
+  ]);
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'order-service' });
   });
 
-  app.get('/api/orders', (req, res) => {
-    res.json({ success: true, data: orders });
+  app.get('/api/orders', async (req, res) => {
+    const filteredOrders = req.query.customerId
+      ? await orderRepository.listByCustomer(req.query.customerId)
+      : await orderRepository.list();
+    res.json({ success: true, data: filteredOrders });
   });
 
-  app.post('/api/orders', (req, res) => {
+  app.post('/api/orders', async (req, res) => {
     const { customerId, providerId, items, scheduledFor, deliveryType } = req.body || {};
 
     if (!customerId || !providerId || !Array.isArray(items) || items.length === 0) {
@@ -56,7 +60,7 @@ const createApp = () => {
       total
     };
 
-    orders.push(newOrder);
+    await orderRepository.save(newOrder);
 
     return res.status(201).json({
       success: true,

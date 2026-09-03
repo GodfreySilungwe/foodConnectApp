@@ -1,4 +1,5 @@
 const express = require('express');
+const { createUserRepository } = require('./repositories');
 
 const createApp = () => {
   const app = express();
@@ -12,22 +13,21 @@ const createApp = () => {
   });
   app.use(express.json());
 
-  const users = [
+  const userRepository = createUserRepository([
     { id: 'u-001', name: 'Demo Customer', email: 'customer@example.com', password: '123456', role: 'customer' },
     { id: 'u-002', name: 'Demo Provider', email: 'provider@example.com', password: '123456', role: 'provider' }
-  ];
+  ]);
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'identity-service' });
   });
 
-  app.get('/api/users', (req, res) => {
-    res.json({ users });
+  app.get('/api/users', async (req, res) => {
+    res.json({ users: await userRepository.list() });
   });
 
-  app.post('/api/auth/register', (req, res) => {
+  app.post('/api/auth/register', async (req, res) => {
     const { name, email, password, role } = req.body || {};
-
     if (!name || !email || !password || !role) {
       return res.status(400).json({
         success: false,
@@ -36,7 +36,7 @@ const createApp = () => {
       });
     }
 
-    const exists = users.some((user) => user.email === email);
+    const exists = await userRepository.findByEmail(email);
     if (exists) {
       return res.status(409).json({
         success: false,
@@ -52,7 +52,7 @@ const createApp = () => {
       role
     };
 
-    users.push(newUser);
+    await userRepository.save(newUser);
 
     return res.status(201).json({
       success: true,
@@ -66,9 +66,8 @@ const createApp = () => {
     });
   });
 
-  app.post('/api/auth/login', (req, res) => {
+  app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body || {};
-
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -77,9 +76,9 @@ const createApp = () => {
       });
     }
 
-    const user = users.find((entry) => entry.email === email && entry.password === password);
+    const user = await userRepository.findByEmail(email);
 
-    if (!user) {
+    if (!user || user.password !== password) {
       return res.status(401).json({
         success: false,
         error: 'Invalid credentials'

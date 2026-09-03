@@ -1,4 +1,20 @@
 services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: foodconnect-dynamodb
+    user: root
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data -disableTelemetry"
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/shell/ || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -51,6 +67,15 @@ services:
     environment:
       PORT: 3002
       NODE_ENV: development
+      USE_DYNAMODB: "true"
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      AWS_REGION: ap-southeast-1
+      AWS_ACCESS_KEY_ID: fakeMyKeyId
+      AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
+      USERS_TABLE: foodconnect-dev-users
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3002/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"" ]
       interval: 15s
@@ -69,6 +94,16 @@ services:
     environment:
       PORT: 3003
       NODE_ENV: development
+      USE_DYNAMODB: "true"
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      AWS_REGION: ap-southeast-1
+      AWS_ACCESS_KEY_ID: fakeMyKeyId
+      AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
+      PROVIDERS_TABLE: foodconnect-dev-providers
+      MENUS_TABLE: foodconnect-dev-menus
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3003/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"" ]
       interval: 15s
@@ -87,6 +122,15 @@ services:
     environment:
       PORT: 3004
       NODE_ENV: development
+      USE_DYNAMODB: "true"
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      AWS_REGION: ap-southeast-1
+      AWS_ACCESS_KEY_ID: fakeMyKeyId
+      AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
+      ORDERS_TABLE: foodconnect-dev-orders
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3004/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"" ]
       interval: 15s
@@ -94,3 +138,6 @@ services:
       retries: 5
       start_period: 20s
     restart: unless-stopped
+
+volumes:
+  dynamodb-data:
