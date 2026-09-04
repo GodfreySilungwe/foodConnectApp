@@ -1,0 +1,75 @@
+.school-card {
+  display: block;
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-gray-200);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+  text-decoration: none;
+  color: inherit;
+  text-align: center;
+}
+
+.school-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary-light);
+}
+
+.school-card-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--spacing-3);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  overflow: hidden;
+}
+
+.school-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.school-card-name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  margin-bottom: var(--spacing-1);
+  color: var(--color-gray-900);
+}
+
+.school-card-location {
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
+  margin-bottom: var(--spacing-1);
+}
+
+.school-card-students {
+  font-size: var(--text-sm);
+  color: var(--color-gray-600);
+  margin-bottom: var(--spacing-3);
+}
+
+.school-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.school-card-providers {
+  font-size: var(--text-sm);
+  color: var(--color-gray-500);
+}
+
+.school-card-view {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-primary);
+}

@@ -28,6 +28,10 @@ const createApp = () => {
     { id: 'm-101', providerId: 'p-001', name: 'Chicken Rice', price: 22.5, available: true }
   ]);
 
+  const schools = [
+    { id: 's-001', name: 'FoodConnect Central Campus', location: 'Singapore', studentCount: 1200, providerCount: 1 }
+  ];
+
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'provider-service' });
   });
@@ -36,9 +40,36 @@ const createApp = () => {
     res.json({ success: true, data: await providerRepository.list() });
   });
 
+  app.get('/api/providers/:providerId', async (req, res) => {
+    const provider = await providerRepository.findById(req.params.providerId);
+    if (!provider) return res.status(404).json({ success: false, error: 'Provider not found' });
+    const menu = await menuRepository.listByProvider(provider.id);
+    return res.json({ success: true, data: { ...provider, menuCount: menu.length } });
+  });
+
   app.get('/api/providers/:providerId/menu', async (req, res) => {
     const items = await menuRepository.listByProvider(req.params.providerId);
     return res.json({ success: true, data: items });
+  });
+
+  app.get('/api/menu/featured', async (req, res) => {
+    const providers = await providerRepository.list();
+    const providerNames = new Map(providers.map((provider) => [provider.id, provider.name]));
+    const items = (await menuRepository.list()).filter((item) => item.available).map((item) => ({
+      ...item,
+      providerName: providerNames.get(item.providerId) || 'Food provider'
+    }));
+    return res.json({ success: true, data: items });
+  });
+
+  app.get('/api/schools', (req, res) => {
+    res.json({ success: true, data: schools });
+  });
+
+  app.get('/api/schools/:schoolId', (req, res) => {
+    const school = schools.find((item) => item.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ success: false, error: 'School not found' });
+    return res.json({ success: true, data: school });
   });
 
   app.get('/api/admin/providers', requireAuth('admin'), async (req, res) => {

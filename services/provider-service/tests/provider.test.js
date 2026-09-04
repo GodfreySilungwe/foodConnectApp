@@ -55,6 +55,20 @@ describe('Provider service', () => {
     ]));
   });
 
+  it('provides featured menu and school discovery data', async () => {
+    const menuResponse = await request(app).get('/api/menu/featured');
+    const schoolResponse = await request(app).get('/api/schools');
+
+    expect(menuResponse.statusCode).toBe(200);
+    expect(menuResponse.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'm-101', providerName: 'Sunrise Kitchen' })
+    ]));
+    expect(schoolResponse.statusCode).toBe(200);
+    expect(schoolResponse.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 's-001' })
+    ]));
+  });
+
   it('rejects menu creation by a customer', async () => {
     const response = await request(app)
       .post('/api/providers/p-001/menu')

@@ -1,3 +1,7 @@
+import { AuthProvider } from '@/contexts/AuthContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
+import './globals.css';
+
 export const metadata = {
   title: 'FoodConnect',
   description: 'Sprint 1 foundation for FoodConnect capstone project',
@@ -6,7 +10,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <NotificationProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </NotificationProvider>
+      </body>
     </html>
   );
 }
