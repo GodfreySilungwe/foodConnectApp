@@ -92,7 +92,8 @@ const createApp = () => {
 
     const owner = await providerRepository.findByOwnerUserId(req.user.userId);
     const ownsLegacyProvider = req.user.providerId === providerId;
-    if (!owner || owner.id !== providerId || (owner.ownerUserId !== req.user.userId && !ownsLegacyProvider)) {
+    const ownsCurrentProvider = owner && owner.id === providerId && owner.ownerUserId === req.user.userId;
+    if (!ownsCurrentProvider && !ownsLegacyProvider) {
       return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
     }
 

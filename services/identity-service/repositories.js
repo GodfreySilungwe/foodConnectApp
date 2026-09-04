@@ -24,11 +24,27 @@ class DynamoUserRepository {
     const storedUsers = await dynamo.listUsers();
     const storedIds = new Set(storedUsers.map((user) => user.id));
     const missingUsers = this.seedUsers.filter((user) => !storedIds.has(user.id));
+    const seedById = new Map(this.seedUsers.map((user) => [user.id, user]));
+    const migratedUsers = storedUsers.map((user) => {
+      const seedUser = seedById.get(user.id);
+      if (!seedUser) return user;
+
+      const migratedUser = { ...user };
+      if (!migratedUser.providerId && seedUser.providerId) migratedUser.providerId = seedUser.providerId;
+      if (!migratedUser.role && seedUser.role) migratedUser.role = seedUser.role;
+      return migratedUser;
+    });
+
+    const changedUsers = migratedUsers.filter((user, index) => user !== storedUsers[index]);
+    if (changedUsers.length > 0) {
+      await Promise.all(changedUsers.map((user) => dynamo.saveUser(user)));
+    }
+
     if (missingUsers.length > 0) {
       await Promise.all(missingUsers.map((user) => dynamo.saveUser(user)));
-      return [...storedUsers, ...missingUsers];
+      return [...migratedUsers, ...missingUsers];
     }
-    return storedUsers;
+    return migratedUsers;
   }
 
   async findByEmail(email) {
