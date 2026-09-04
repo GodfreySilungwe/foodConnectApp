@@ -4,7 +4,7 @@ import './globals.css';
 
 export const metadata = {
   title: 'FoodConnect',
-  description: 'Sprint 1 foundation for FoodConnect capstone project',
+  description: 'A trusted marketplace for local food providers and communities',
 };
 
 export default function RootLayout({ children }) {

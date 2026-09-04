@@ -186,3 +186,20 @@
     box-shadow: var(--shadow-lg);
   }
 }
+
+/* Shared application shell */
+.header { box-shadow: 0 1px 0 rgba(23, 42, 54, 0.08); }
+.header-logo-icon { border-radius: 50%; }
+.header-signin { color: var(--color-secondary); font-size: var(--text-sm); font-weight: 700; }
+.header-register, .header-action-button { display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--spacing-4); border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-white); font-size: var(--text-sm); font-weight: 700; }
+.header-register:hover { color: var(--color-white); background: var(--color-primary-dark); }
+.header-action-button { border: 0; cursor: pointer; }
+.header-action-button:hover { background: var(--color-secondary-light); }
+
+@media (max-width: 768px) {
+  .header-nav { gap: var(--spacing-2); }
+  .header-nav-link { padding-inline: var(--spacing-2); }
+  .header-logo span:last-child { display: none; }
+  .header-actions { gap: var(--spacing-2); }
+  .header-signin { display: none; }
+}

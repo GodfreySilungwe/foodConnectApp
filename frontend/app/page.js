@@ -7,6 +7,7 @@ import ProviderCard from '@/components/provider/ProviderCard';
 import MenuGrid from '@/components/menu/MenuGrid';
 import SchoolCard from '@/components/school/SchoolCard';
 import DashboardStats from '@/dashboard/DashboardStats';
+import AppHeader from '@/components/common/AppHeader';
 import { api } from '@/services/api';
 import '@/styles/pages/Home.css';
 
@@ -63,6 +64,7 @@ export default function HomePage() {
 
   return (
     <div className="home-page">
+      <AppHeader />
       {/* Hero Section */}
       <section className="hero">
         <div className="container hero-inner">

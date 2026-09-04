@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { api } from '@/services/api';
 import MenuGrid from '@/components/menu/MenuGrid';
+import AppHeader from '@/components/common/AppHeader';
 
 export default function ProviderDetailsPage() {
   const { providerId } = useParams();
@@ -23,10 +24,10 @@ export default function ProviderDetailsPage() {
   }, [providerId]);
 
   return (
-    <main className="container page-content">
-      <Link href="/providers">Back to providers</Link>
+    <><AppHeader /><main className="container page-content">
+      <Link href="/providers" className="page-back">Back to providers</Link>
       {error && <p>{error}</p>}
-      {provider && <><h1>{provider.name}</h1><p>{provider.ownerName} · {provider.status}</p><MenuGrid items={menu} /></>}
-    </main>
+      {provider && <><div className="page-heading"><p className="eyebrow">Provider profile</p><h1>{provider.name}</h1><p>{provider.ownerName} · {provider.status}</p></div><MenuGrid items={menu} /></>}
+    </main></>
   );
 }

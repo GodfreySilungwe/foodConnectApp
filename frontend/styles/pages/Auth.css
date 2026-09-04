@@ -104,3 +104,37 @@
     padding: var(--spacing-6);
   }
 }
+
+/* Enterprise authentication surface */
+.auth-page {
+  background: var(--color-secondary);
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-page::before {
+  content: 'FOODCONNECT';
+  position: fixed;
+  top: 2rem;
+  left: 2.5rem;
+  color: rgba(255,255,255,.58);
+  font: 800 .8rem var(--font-heading);
+  letter-spacing: .16em;
+}
+
+.auth-container { max-width: 980px; }
+.auth-card { padding: 3.25rem; border-radius: var(--radius-lg); box-shadow: 0 24px 70px rgba(0,0,0,.22); }
+.auth-header h1 { font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.04em; }
+.auth-icon { display: inline-flex; align-items: center; justify-content: center; width: 54px; height: 54px; margin-bottom: 1.25rem; border-radius: 50%; background: var(--color-primary-bg); font-size: 28px; }
+.auth-subtitle { color: var(--color-gray-600); }
+.form-group label { color: var(--color-secondary); font-weight: 700; }
+.form-group input, .form-group select { min-height: 48px; border-radius: var(--radius-md); border-color: var(--color-gray-300); background: #fcfcfb; }
+.form-group input:focus, .form-group select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(217,101,59,.12); }
+.auth-footer { border-top: 1px solid var(--color-gray-200); padding-top: 1.5rem; }
+
+@media (max-width: 480px) {
+  .auth-page { padding: 1rem; }
+  .auth-page::before { position: static; display: block; margin: .5rem 0 1rem; }
+  .auth-card { padding: 1.5rem; }
+}

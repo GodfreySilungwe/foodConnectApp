@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
+import AppHeader from '@/components/common/AppHeader';
 import '@/styles/pages/Auth.css';
 
 export default function LoginPage() {
@@ -30,7 +31,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-page">
+    <><AppHeader /><div className="auth-page">
       <div className="auth-container">
         <div className="auth-card">
           <div className="auth-header">
@@ -87,6 +88,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
+    </div></>
   );
 }

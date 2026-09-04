@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { api } from '@/services/api';
+import AppHeader from '@/components/common/AppHeader';
 
 export default function SchoolDetailsPage() {
   const { schoolId } = useParams();
@@ -18,10 +19,10 @@ export default function SchoolDetailsPage() {
   }, [schoolId]);
 
   return (
-    <main className="container page-content">
-      <Link href="/">Back to home</Link>
+    <><AppHeader /><main className="container page-content">
+      <Link href="/" className="page-back">Back to home</Link>
       {error && <p>{error}</p>}
-      {school && <><h1>{school.name}</h1><p>{school.location}</p><p>{school.studentCount} students</p></>}
-    </main>
+      {school && <div className="page-heading"><p className="eyebrow">Community partner</p><h1>{school.name}</h1><p>{school.location} · {school.studentCount} students</p></div>}
+    </main></>
   );
 }
