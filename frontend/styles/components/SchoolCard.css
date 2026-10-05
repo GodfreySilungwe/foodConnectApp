@@ -1,32 +1,32 @@
 .school-card {
   display: block;
-  background: var(--color-white);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-4);
-  border: 1px solid var(--color-gray-200);
-  box-shadow: var(--shadow-sm);
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 1.2rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(23, 42, 54, 0.06);
+  box-shadow: 0 14px 24px rgba(23, 42, 54, 0.04);
   transition: all var(--transition-base);
   text-decoration: none;
   color: inherit;
-  text-align: center;
+  text-align: left;
 }
 
 .school-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--color-primary-light);
+  transform: translateY(-6px);
+  box-shadow: 0 26px 38px rgba(23, 42, 54, 0.08);
+  border-color: rgba(217, 101, 59, 0.18);
 }
 
 .school-card-icon {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto var(--spacing-3);
-  border-radius: var(--radius-full);
-  background: var(--color-primary-bg);
+  width: 64px;
+  height: 64px;
+  margin-bottom: 0.8rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #fff4eb 0%, #f1f5f7 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40px;
+  font-size: 1.8rem;
   overflow: hidden;
 }
 
@@ -37,39 +37,37 @@
 }
 
 .school-card-name {
-  font-size: var(--text-base);
-  font-weight: 600;
-  margin-bottom: var(--spacing-1);
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
   color: var(--color-gray-900);
+  letter-spacing: -0.03em;
 }
 
-.school-card-location {
-  font-size: var(--text-sm);
-  color: var(--color-gray-500);
-  margin-bottom: var(--spacing-1);
-}
-
+.school-card-location,
 .school-card-students {
-  font-size: var(--text-sm);
-  color: var(--color-gray-600);
-  margin-bottom: var(--spacing-3);
+  font-size: 0.78rem;
+  color: var(--color-gray-500);
+  margin-bottom: 0.28rem;
 }
 
 .school-card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: var(--spacing-3);
-  border-top: 1px solid var(--color-gray-200);
+  padding-top: 0.85rem;
+  margin-top: 0.7rem;
+  border-top: 1px solid rgba(23, 42, 54, 0.08);
 }
 
 .school-card-providers {
-  font-size: var(--text-sm);
+  font-size: 0.78rem;
   color: var(--color-gray-500);
+  font-weight: 600;
 }
 
 .school-card-view {
-  font-size: var(--text-sm);
-  font-weight: 500;
+  font-size: 0.8rem;
+  font-weight: 800;
   color: var(--color-primary);
 }

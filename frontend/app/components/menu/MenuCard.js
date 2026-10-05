@@ -12,20 +12,39 @@ export default function MenuCard({ item, showProvider = false }) {
   const { showNotification } = useContext(NotificationContext);
   const [quantity, setQuantity] = useState(1);
   const [isOrdering, setIsOrdering] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [schools, setSchools] = useState([]);
+  const [studentName, setStudentName] = useState('');
+  const [schoolId, setSchoolId] = useState('');
+  const [schoolError, setSchoolError] = useState('');
 
-  const handleOrder = async () => {
+  const openCheckout = async () => {
     if (!user) {
       showNotification('Please sign in to place an order', 'warning');
       return;
     }
 
-    if (user.role === 'provider') {
-      showNotification('Providers cannot place orders', 'error');
+    if (user.role !== 'customer') {
+      showNotification('Only parent accounts can place orders', 'error');
       return;
     }
 
+    setShowCheckout(true);
+    if (schools.length) return;
+    try {
+      const result = await api.getSchools();
+      setSchools(result.data || []);
+      setSchoolId(result.data?.[0]?.id || '');
+    } catch (error) {
+      setSchoolError(error.message || 'Could not load registered schools');
+    }
+  };
+
+  const handleOrder = async (event) => {
+    event.preventDefault();
     setIsOrdering(true);
     try {
+      const school = schools.find((entry) => entry.id === schoolId);
       const orderData = {
         providerId: item.providerId,
         items: [
@@ -37,11 +56,16 @@ export default function MenuCard({ item, showProvider = false }) {
         ],
         deliveryType: 'collection',
         scheduledFor: null,
+        studentName,
+        schoolId,
+        schoolName: school?.name,
       };
 
-      const result = await api.createOrder(orderData, token);
+      await api.createOrder(orderData, token);
       showNotification('Order placed successfully!', 'success');
       setQuantity(1);
+      setStudentName('');
+      setShowCheckout(false);
     } catch (error) {
       showNotification(error.message || 'Failed to place order', 'error');
     } finally {
@@ -90,13 +114,35 @@ export default function MenuCard({ item, showProvider = false }) {
           </div>
           <button
             className="btn btn-primary btn-sm"
-            onClick={handleOrder}
+            onClick={openCheckout}
             disabled={isOrdering || item.available === false}
           >
-            {isOrdering ? 'Ordering...' : 'Book Now'}
+            Order for student
           </button>
         </div>
       </div>
+      {showCheckout && (
+        <div className="checkout-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setShowCheckout(false)}>
+          <form className="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby={`checkout-title-${item.id}`} onSubmit={handleOrder}>
+            <h2 id={`checkout-title-${item.id}`}>Student order details</h2>
+            <p>{item.name} · {quantity} {quantity === 1 ? 'meal' : 'meals'}</p>
+            <label className="checkout-field" htmlFor={`student-name-${item.id}`}>Student name
+              <input id={`student-name-${item.id}`} value={studentName} onChange={(event) => setStudentName(event.target.value)} required maxLength={100} autoFocus />
+            </label>
+            <label className="checkout-field" htmlFor={`school-${item.id}`}>School
+              <select id={`school-${item.id}`} value={schoolId} onChange={(event) => setSchoolId(event.target.value)} required disabled={!schools.length}>
+                {schools.length ? schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>) : <option value="">No registered schools</option>}
+              </select>
+            </label>
+            {schoolError && <p className="checkout-error" role="alert">{schoolError}</p>}
+            {!schoolError && !schools.length && <p className="checkout-hint">No schools are available yet. A school administrator can register one from the <Link href="/schools">school directory</Link>.</p>}
+            <div className="checkout-actions">
+              <button type="button" className="btn btn-sm" onClick={() => setShowCheckout(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={isOrdering || !schools.length}>{isOrdering ? 'Placing order...' : 'Place order'}</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

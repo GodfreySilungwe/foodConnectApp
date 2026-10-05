@@ -19,7 +19,7 @@ export default function SchoolsPage() {
   return (
     <><AppHeader /><main className="container page-content">
       <Link href="/" className="page-back">Back to home</Link>
-      <div className="page-heading"><p className="eyebrow">Community network</p><h1>Registered schools</h1><p>Places where local food services are available to students and staff.</p></div>
+      <div className="page-heading"><p className="eyebrow">Community network</p><h1>Registered schools</h1><p>Places where local food services are available to students and staff.</p><Link href="/schools/register" className="btn btn-primary btn-sm">Register a school</Link></div>
       {error ? <p>{error}</p> : <div className="school-grid">{schools.map((school) => <SchoolCard key={school.id} school={school} />)}</div>}
     </main></>
   );

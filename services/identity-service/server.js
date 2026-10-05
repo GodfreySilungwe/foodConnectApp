@@ -40,7 +40,7 @@ const createApp = () => {
 
   app.post('/api/auth/register', async (req, res) => {
     const { name, email, password, role } = req.body || {};
-    if (!name || !email || !password || !['customer', 'provider'].includes(role)) {
+    if (!name || !email || !password || !['customer', 'provider', 'school'].includes(role)) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',

@@ -19,12 +19,16 @@ describe('Order service', () => {
         items: [
           { menuId: 'm-101', quantity: 2, price: 22.5 }
         ],
+        studentName: 'Taylor Smith',
+        schoolId: 's-001',
+        schoolName: 'FoodConnect Central Campus',
         deliveryType: 'delivery'
       });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.success).toBe(true);
     expect(response.body.data.status).toBe('pending');
+    expect(response.body.data).toMatchObject({ studentName: 'Taylor Smith', schoolId: 's-001' });
   });
 
   it('rejects order without required fields', async () => {
@@ -71,10 +75,20 @@ describe('Order service', () => {
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', `Bearer ${otherCustomerToken}`)
-      .send({ customerId: 'u-001', providerId: 'p-001', items: [{ menuId: 'm-101', quantity: 1, price: 22.5 }] });
+      .send({ customerId: 'u-001', providerId: 'p-001', studentName: 'Taylor Smith', schoolId: 's-001', items: [{ menuId: 'm-101', quantity: 1, price: 22.5 }] });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.data.customerId).toBe('u-999');
+  });
+
+  it('rejects an order without student and school details', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ providerId: 'p-001', items: [{ menuId: 'm-101', quantity: 1, price: 22.5 }] });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body.details).toContain('providerId, studentName, schoolId, and at least one item are required');
   });
 
   it('does not expose another provider’s incoming orders', async () => {

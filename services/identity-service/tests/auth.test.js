@@ -83,4 +83,13 @@ describe('Identity service auth', () => {
     expect(response.statusCode).toBe(201);
     expect(response.body.data.providerId).toMatch(/^p-/);
   });
+
+  it('registers a school administrator account', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'School Office', email: 'school-office@example.com', password: 'Secret123!', role: 'school' });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.data.role).toBe('school');
+  });
 });

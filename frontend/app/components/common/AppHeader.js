@@ -17,6 +17,7 @@ export default function AppHeader() {
         </Link>
         <nav className="header-nav" aria-label="Main navigation">
           <Link href="/menu" className="header-nav-link">Menu</Link>
+          <Link href="/schools" className="header-nav-link">Schools</Link>
           <Link href="/providers" className="header-nav-link">Providers</Link>
           {user?.role === 'provider' && <Link href="/orders" className="header-nav-link">Orders</Link>}
         </nav>

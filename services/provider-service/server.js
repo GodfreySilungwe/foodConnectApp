@@ -28,9 +28,9 @@ const createApp = () => {
     { id: 'm-101', providerId: 'p-001', name: 'Chicken Rice', price: 22.5, available: true }
   ]);
 
-  const schools = [
+  const schoolRepository = createRepository(process.env.SCHOOLS_TABLE || 'foodconnect-dev-schools', [
     { id: 's-001', name: 'FoodConnect Central Campus', location: 'Singapore', studentCount: 1200, providerCount: 1 }
-  ];
+  ]);
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'provider-service' });
@@ -62,14 +62,38 @@ const createApp = () => {
     return res.json({ success: true, data: items });
   });
 
-  app.get('/api/schools', (req, res) => {
-    res.json({ success: true, data: schools });
+  app.get('/api/schools', async (req, res) => {
+    res.json({ success: true, data: await schoolRepository.list() });
   });
 
-  app.get('/api/schools/:schoolId', (req, res) => {
-    const school = schools.find((item) => item.id === req.params.schoolId);
+  app.get('/api/schools/:schoolId', async (req, res) => {
+    const school = await schoolRepository.findById(req.params.schoolId);
     if (!school) return res.status(404).json({ success: false, error: 'School not found' });
     return res.json({ success: true, data: school });
+  });
+
+  app.post('/api/schools', requireAuth('school'), async (req, res) => {
+    const { name, location, studentCount } = req.body || {};
+    if (!name || !location) {
+      return res.status(400).json({ success: false, error: 'School name and location are required' });
+    }
+
+    const existingSchools = await schoolRepository.list();
+    if (existingSchools.some((school) => school.name.toLowerCase() === name.trim().toLowerCase())) {
+      return res.status(409).json({ success: false, error: 'A school with this name is already registered' });
+    }
+
+    const newSchool = {
+      id: `s-${Date.now()}`,
+      name: name.trim(),
+      location: location.trim(),
+      studentCount: Number(studentCount) || 0,
+      providerCount: 0,
+      registeredBy: req.user.userId
+    };
+    await schoolRepository.save(newSchool);
+
+    return res.status(201).json({ success: true, data: newSchool, message: 'School registered successfully' });
   });
 
   app.get('/api/admin/providers', requireAuth('admin'), async (req, res) => {

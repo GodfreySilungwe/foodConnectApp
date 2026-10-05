@@ -69,13 +69,14 @@ export default function HomePage() {
       <section className="hero">
         <div className="container hero-inner">
           <div className="hero-content">
+            <div className="hero-tag">Fast delivery • Fresh meals</div>
             <h1 className="hero-title">
-              <span className="hero-highlight">Connect</span> with
-              <br />Local Food Providers
+              <span className="hero-highlight">Local food</span>
+              <br />made easy.
             </h1>
             <p className="hero-description">
-              Discover, order, and enjoy delicious meals from
-              registered providers and schools in your area.
+              Discover trusted school and community food providers near you,
+              then order hot meals in minutes.
             </p>
             <div className="hero-actions">
               <Link href="/menu" className="btn btn-primary btn-lg">
@@ -96,14 +97,30 @@ export default function HomePage() {
               </div>
               <div>
                 <span className="hero-stat-number">{stats.totalOrders}+</span>
-                <span className="hero-stat-label">Orders Delivered</span>
+                <span className="hero-stat-label">Meals delivered</span>
               </div>
             </div>
           </div>
           <div className="hero-image">
-            <div className="hero-image-placeholder">
-              🍱
-              <span className="hero-image-label">Fresh Food, Happy People</span>
+            <div className="hero-visual">
+              <div className="hero-visual-card hero-card-main">
+                <div className="hero-card-icon">🍔</div>
+                <div className="hero-card-copy">
+                  <strong>Best Seller</strong>
+                  <span>Grilled Chicken Wrap</span>
+                </div>
+                <span className="hero-card-price">$18.90</span>
+              </div>
+
+              <div className="hero-visual-badge">
+                <span className="hero-badge-score">4.9</span>
+                <span className="hero-badge-label">Top rated</span>
+              </div>
+
+              <div className="hero-image-placeholder">
+                <div className="hero-food-plate">🍱</div>
+                <span className="hero-image-label">Fresh Food, Happy People</span>
+              </div>
             </div>
           </div>
         </div>

@@ -20,6 +20,8 @@ Request body:
 }
 ```
 
+Supported self-registration roles are `customer` (parent/guardian), `provider`, and `school` (school administrator).
+
 Response:
 ```json
 {
@@ -71,6 +73,19 @@ Requires an admin JWT. Returns user profiles without password hashes.
 
 ### Base URL
 `http://localhost:3003`
+
+#### GET /api/schools
+Returns registered schools for parent checkout and discovery.
+
+#### POST /api/schools
+Requires a school administrator JWT. Request body:
+```json
+{
+  "name": "Northside Primary",
+  "location": "North District",
+  "studentCount": 450
+}
+```
 
 ### Endpoints
 
@@ -168,6 +183,9 @@ Request body:
       "quantity": 2
     }
   ],
+  "studentName": "Taylor Doe",
+  "schoolId": "s-001",
+  "schoolName": "FoodConnect Central Campus",
   "scheduledFor": "2026-09-10T13:00:00Z",
   "deliveryType": "delivery"
 }

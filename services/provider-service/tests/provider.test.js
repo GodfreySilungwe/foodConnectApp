@@ -5,6 +5,7 @@ const app = require('../server');
 const providerToken = jwt.sign({ userId: 'u-002', role: 'provider' }, 'foodconnect-development-secret');
 const newProviderToken = jwt.sign({ userId: 'u-004', role: 'provider', providerId: 'p-004' }, 'foodconnect-development-secret');
 const customerToken = jwt.sign({ userId: 'u-001', role: 'customer' }, 'foodconnect-development-secret');
+const schoolToken = jwt.sign({ userId: 'u-school', role: 'school' }, 'foodconnect-development-secret');
 
 describe('Provider service', () => {
   it('registers a provider', async () => {
@@ -67,6 +68,25 @@ describe('Provider service', () => {
     expect(schoolResponse.body.data).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 's-001' })
     ]));
+  });
+
+  it('registers schools for authenticated school administrators', async () => {
+    const response = await request(app)
+      .post('/api/schools')
+      .set('Authorization', `Bearer ${schoolToken}`)
+      .send({ name: 'Northside Primary', location: 'North District', studentCount: 450 });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.data).toMatchObject({ name: 'Northside Primary', location: 'North District', studentCount: 450 });
+  });
+
+  it('prevents customer accounts from registering schools', async () => {
+    const response = await request(app)
+      .post('/api/schools')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ name: 'Unverified School', location: 'Anywhere' });
+
+    expect(response.statusCode).toBe(403);
   });
 
   it('rejects menu creation by a customer', async () => {
