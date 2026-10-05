@@ -204,7 +204,8 @@
 }
 
 .checkout-field input,
-.checkout-field select {
+.checkout-field select,
+.checkout-field textarea {
   width: 100%;
   min-height: 46px;
   padding: 0.65rem 0.75rem;
@@ -216,7 +217,8 @@
 }
 
 .checkout-field input:focus,
-.checkout-field select:focus {
+.checkout-field select:focus,
+.checkout-field textarea:focus {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }

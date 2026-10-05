@@ -1,0 +1,55 @@
+.provider-schools-page {
+  min-height: calc(100vh - 76px);
+}
+
+.provider-schools-card {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.provider-school-options {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.provider-school-options legend {
+  margin-bottom: 0.7rem;
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+.provider-school-option {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 62px;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  background: #fcfcfb;
+  cursor: pointer;
+}
+
+.provider-school-option input {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  accent-color: var(--color-primary);
+}
+
+.provider-school-option span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.provider-school-option strong {
+  color: var(--color-secondary);
+}
+
+.provider-school-option small {
+  color: var(--color-gray-600);
+}

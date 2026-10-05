@@ -7,7 +7,7 @@ const createApp = () => {
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_ORIGIN || 'http://localhost:3000');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
@@ -20,7 +20,8 @@ const createApp = () => {
       ownerName: 'Alice',
       email: 'sunrise@example.com',
       status: 'active',
-      ownerUserId: 'u-002'
+      ownerUserId: 'u-002',
+      schoolIds: ['s-001']
     }
   ]);
 
@@ -101,18 +102,24 @@ const createApp = () => {
   });
 
   app.post('/api/providers', requireAuth('provider'), async (req, res) => {
-    const { name, ownerName, email, status } = req.body || {};
+    const { name, ownerName, email, status, schoolIds = [] } = req.body || {};
 
     if (await providerRepository.findByOwnerUserId(req.user.userId) || await providerRepository.findById(req.user.providerId)) {
       return res.status(409).json({ success: false, error: 'Provider account may register only one provider' });
     }
 
-    if (!name || !ownerName || !email) {
+    if (!name || !ownerName || !email || !Array.isArray(schoolIds)) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
-        details: ['name, ownerName, and email are required']
+        details: ['name, ownerName, email, and an array of schoolIds are required']
       });
+    }
+
+    const registeredSchools = await schoolRepository.list();
+    const registeredSchoolIds = new Set(registeredSchools.map((school) => school.id));
+    if (schoolIds.some((schoolId) => !registeredSchoolIds.has(schoolId))) {
+      return res.status(400).json({ success: false, error: 'One or more selected schools are not registered' });
     }
 
     const newProvider = {
@@ -121,7 +128,8 @@ const createApp = () => {
       ownerName,
       email,
       status: status || 'active',
-      ownerUserId: req.user.userId
+      ownerUserId: req.user.userId,
+      schoolIds: [...new Set(schoolIds)]
     };
 
     await providerRepository.save(newProvider);
@@ -131,6 +139,33 @@ const createApp = () => {
       data: newProvider,
       message: 'Provider registered successfully'
     });
+  });
+
+  app.put('/api/providers/:providerId/schools', requireAuth('provider'), async (req, res) => {
+    const { providerId } = req.params;
+    const { schoolIds } = req.body || {};
+    const provider = await providerRepository.findById(providerId);
+    const ownsProvider = provider && (
+      provider.ownerUserId === req.user.userId ||
+      (req.user.providerId === providerId && (!provider.ownerUserId || provider.ownerUserId === req.user.userId))
+    );
+
+    if (!ownsProvider) {
+      return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
+    }
+    if (!Array.isArray(schoolIds)) {
+      return res.status(400).json({ success: false, error: 'schoolIds must be an array' });
+    }
+
+    const registeredSchools = await schoolRepository.list();
+    const registeredSchoolIds = new Set(registeredSchools.map((school) => school.id));
+    if (schoolIds.some((schoolId) => !registeredSchoolIds.has(schoolId))) {
+      return res.status(400).json({ success: false, error: 'One or more selected schools are not registered' });
+    }
+
+    const updatedProvider = { ...provider, schoolIds: [...new Set(schoolIds)] };
+    await providerRepository.save(updatedProvider);
+    return res.json({ success: true, data: updatedProvider, message: 'Provider school coverage updated' });
   });
 
   app.post('/api/providers/:providerId/menu', requireAuth('provider'), async (req, res) => {

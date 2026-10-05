@@ -90,13 +90,16 @@ Requires a school administrator JWT. Request body:
 ### Endpoints
 
 #### POST /api/providers
+Requires a provider JWT. `schoolIds` contains the registered schools served by this provider.
+
 Request body:
 ```json
 {
   "name": "Sunrise Kitchen",
   "ownerName": "Alice",
   "email": "sunrise@example.com",
-  "status": "active"
+  "status": "active",
+  "schoolIds": ["s-001"]
 }
 ```
 
@@ -117,6 +120,14 @@ Response:
   "name": "Sunrise Kitchen",
   "status": "active",
   "menuCount": 7
+}
+```
+
+#### PUT /api/providers/:providerId/schools
+Requires the owning provider JWT. Replaces the provider's school coverage:
+```json
+{
+  "schoolIds": ["s-001"]
 }
 ```
 
@@ -184,8 +195,10 @@ Request body:
     }
   ],
   "studentName": "Taylor Doe",
+  "studentClass": "Year 4",
   "schoolId": "s-001",
   "schoolName": "FoodConnect Central Campus",
+  "foodPreferences": "No peanuts; mild spice",
   "scheduledFor": "2026-09-10T13:00:00Z",
   "deliveryType": "delivery"
 }

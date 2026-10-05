@@ -69,6 +69,15 @@ export const api = {
       },
       token
     ),
+  updateProviderSchools: (providerId, schoolIds, token) =>
+    request(
+      `${urls.provider}/api/providers/${providerId}/schools`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ schoolIds }),
+      },
+      token
+    ),
 
   // Menu
   getMenu: (providerId) =>

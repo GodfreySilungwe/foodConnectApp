@@ -22,7 +22,9 @@ class MemoryRepository {
   }
 
   async save(item) {
-    this.items.push(item);
+    const existingIndex = this.items.findIndex((existing) => existing.id === item.id);
+    if (existingIndex < 0) this.items.push(item);
+    else this.items[existingIndex] = item;
     return item;
   }
 }

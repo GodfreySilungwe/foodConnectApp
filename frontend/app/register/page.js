@@ -16,8 +16,9 @@ export default function RegisterPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('role') === 'school') {
-      setForm((current) => ({ ...current, role: 'school' }));
+    const requestedRole = new URLSearchParams(window.location.search).get('role');
+    if (requestedRole === 'school' || requestedRole === 'provider') {
+      setForm((current) => ({ ...current, role: requestedRole }));
     }
   }, []);
 
@@ -29,7 +30,7 @@ export default function RegisterPage() {
     try {
       await register(form);
       showNotification('Your account is ready.', 'success');
-      router.push(form.role === 'school' ? '/schools/register' : '/');
+      router.push(form.role === 'school' ? '/schools/register' : form.role === 'provider' ? '/providers/schools' : '/');
     } catch (error) {
       showNotification(error.message || 'Registration failed', 'error');
     } finally {

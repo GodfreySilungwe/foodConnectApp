@@ -65,14 +65,14 @@ const createApp = () => {
   });
 
   app.post('/api/orders', requireAuth('customer'), async (req, res) => {
-    const { providerId, items, scheduledFor, deliveryType, studentName, schoolId, schoolName } = req.body || {};
+    const { providerId, items, scheduledFor, deliveryType, studentName, studentClass, schoolId, schoolName, foodPreferences } = req.body || {};
     const customerId = req.user.userId;
 
-    if (!customerId || !providerId || !Array.isArray(items) || items.length === 0 || !studentName?.trim() || !schoolId?.trim()) {
+    if (!customerId || !providerId || !Array.isArray(items) || items.length === 0 || !studentName?.trim() || !studentClass?.trim() || !schoolId?.trim()) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
-        details: ['providerId, studentName, schoolId, and at least one item are required']
+        details: ['providerId, studentName, studentClass, schoolId, and at least one item are required']
       });
     }
 
@@ -87,8 +87,10 @@ const createApp = () => {
       providerId,
       items,
       studentName: studentName.trim(),
+      studentClass: studentClass.trim(),
       schoolId: schoolId.trim(),
       schoolName: schoolName?.trim() || null,
+      foodPreferences: foodPreferences?.trim() || '',
       scheduledFor: scheduledFor || null,
       deliveryType: deliveryType || 'collection',
       status: 'pending',

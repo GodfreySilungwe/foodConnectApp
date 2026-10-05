@@ -16,12 +16,14 @@ describe('Provider service', () => {
         name: 'Green Bowl',
         ownerName: 'Jane Doe',
         email: 'green@example.com',
-        status: 'active'
+        status: 'active',
+        schoolIds: ['s-001']
       });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.success).toBe(true);
     expect(response.body.data.name).toBe('Green Bowl');
+    expect(response.body.data.schoolIds).toEqual(['s-001']);
 
     const duplicateResponse = await request(app)
       .post('/api/providers')
@@ -29,6 +31,31 @@ describe('Provider service', () => {
       .send({ name: 'Second Kitchen', ownerName: 'Jane Doe', email: 'second@example.com' });
 
     expect(duplicateResponse.statusCode).toBe(409);
+  });
+
+  it('updates school coverage only for the owning provider', async () => {
+    const response = await request(app)
+      .put('/api/providers/p-001/schools')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ schoolIds: ['s-001'] });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.data.schoolIds).toEqual(['s-001']);
+
+    const unauthorizedResponse = await request(app)
+      .put('/api/providers/p-001/schools')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ schoolIds: [] });
+    expect(unauthorizedResponse.statusCode).toBe(403);
+  });
+
+  it('rejects coverage that references an unregistered school', async () => {
+    const response = await request(app)
+      .put('/api/providers/p-001/schools')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ schoolIds: ['s-missing'] });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it('creates a menu item for a provider', async () => {

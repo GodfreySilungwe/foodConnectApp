@@ -19,6 +19,7 @@ export default function AppHeader() {
           <Link href="/menu" className="header-nav-link">Menu</Link>
           <Link href="/schools" className="header-nav-link">Schools</Link>
           <Link href="/providers" className="header-nav-link">Providers</Link>
+          {user?.role === 'provider' && <Link href="/providers/schools" className="header-nav-link">School coverage</Link>}
           {user?.role === 'provider' && <Link href="/orders" className="header-nav-link">Orders</Link>}
         </nav>
         <div className="header-actions">

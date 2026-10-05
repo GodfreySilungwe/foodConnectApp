@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
@@ -15,8 +16,11 @@ export default function MenuCard({ item, showProvider = false }) {
   const [showCheckout, setShowCheckout] = useState(false);
   const [schools, setSchools] = useState([]);
   const [studentName, setStudentName] = useState('');
+  const [studentClass, setStudentClass] = useState('');
+  const [foodPreferences, setFoodPreferences] = useState('');
   const [schoolId, setSchoolId] = useState('');
   const [schoolError, setSchoolError] = useState('');
+  const [isLoadingSchools, setIsLoadingSchools] = useState(false);
 
   const openCheckout = async () => {
     if (!user) {
@@ -30,13 +34,23 @@ export default function MenuCard({ item, showProvider = false }) {
     }
 
     setShowCheckout(true);
-    if (schools.length) return;
+    if (isLoadingSchools) return;
+    setIsLoadingSchools(true);
+    setSchoolError('');
     try {
-      const result = await api.getSchools();
-      setSchools(result.data || []);
-      setSchoolId(result.data?.[0]?.id || '');
+      const [schoolResult, providerResult] = await Promise.all([
+        api.getSchools(),
+        api.getProvider(item.providerId),
+      ]);
+      const supportedSchoolIds = providerResult.data?.schoolIds || [];
+      const supportedSchools = (schoolResult.data || []).filter((school) => supportedSchoolIds.includes(school.id));
+      setSchools(supportedSchools);
+      setSchoolId(supportedSchools[0]?.id || '');
+      if (!supportedSchools.length) setSchoolError('This provider has not registered any schools for delivery yet.');
     } catch (error) {
       setSchoolError(error.message || 'Could not load registered schools');
+    } finally {
+      setIsLoadingSchools(false);
     }
   };
 
@@ -57,14 +71,18 @@ export default function MenuCard({ item, showProvider = false }) {
         deliveryType: 'collection',
         scheduledFor: null,
         studentName,
+        studentClass,
         schoolId,
         schoolName: school?.name,
+        foodPreferences,
       };
 
       await api.createOrder(orderData, token);
       showNotification('Order placed successfully!', 'success');
       setQuantity(1);
       setStudentName('');
+      setStudentClass('');
+      setFoodPreferences('');
       setShowCheckout(false);
     } catch (error) {
       showNotification(error.message || 'Failed to place order', 'error');
@@ -74,6 +92,7 @@ export default function MenuCard({ item, showProvider = false }) {
   };
 
   return (
+    <>
     <div className="menu-card">
       <div className="menu-card-image">
         {item.image ? (
@@ -121,7 +140,8 @@ export default function MenuCard({ item, showProvider = false }) {
           </button>
         </div>
       </div>
-      {showCheckout && (
+    </div>
+    {showCheckout && createPortal(
         <div className="checkout-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setShowCheckout(false)}>
           <form className="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby={`checkout-title-${item.id}`} onSubmit={handleOrder}>
             <h2 id={`checkout-title-${item.id}`}>Student order details</h2>
@@ -129,20 +149,27 @@ export default function MenuCard({ item, showProvider = false }) {
             <label className="checkout-field" htmlFor={`student-name-${item.id}`}>Student name
               <input id={`student-name-${item.id}`} value={studentName} onChange={(event) => setStudentName(event.target.value)} required maxLength={100} autoFocus />
             </label>
+            <label className="checkout-field" htmlFor={`student-class-${item.id}`}>Student class
+              <input id={`student-class-${item.id}`} value={studentClass} onChange={(event) => setStudentClass(event.target.value)} placeholder="For example, Year 4" required maxLength={60} />
+            </label>
             <label className="checkout-field" htmlFor={`school-${item.id}`}>School
               <select id={`school-${item.id}`} value={schoolId} onChange={(event) => setSchoolId(event.target.value)} required disabled={!schools.length}>
-                {schools.length ? schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>) : <option value="">No registered schools</option>}
+                {isLoadingSchools ? <option value="">Loading provider schools...</option> : schools.length ? schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>) : <option value="">No served schools available</option>}
               </select>
+            </label>
+            <label className="checkout-field" htmlFor={`food-preferences-${item.id}`}>Food preferences or allergies
+              <textarea id={`food-preferences-${item.id}`} value={foodPreferences} onChange={(event) => setFoodPreferences(event.target.value)} placeholder="Allergies, ingredients to avoid, or preparation requests" maxLength={500} rows={3} />
             </label>
             {schoolError && <p className="checkout-error" role="alert">{schoolError}</p>}
             {!schoolError && !schools.length && <p className="checkout-hint">No schools are available yet. A school administrator can register one from the <Link href="/schools">school directory</Link>.</p>}
             <div className="checkout-actions">
               <button type="button" className="btn btn-sm" onClick={() => setShowCheckout(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary btn-sm" disabled={isOrdering || !schools.length}>{isOrdering ? 'Placing order...' : 'Place order'}</button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={isOrdering || isLoadingSchools || !schools.length}>{isOrdering ? 'Placing order...' : 'Place order'}</button>
             </div>
           </form>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
