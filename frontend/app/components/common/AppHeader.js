@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { useContext } from 'react';
+import { usePathname } from 'next/navigation';
 import { AuthContext } from '@/contexts/AuthContext';
 import '@/styles/components/Header.css';
 
 export default function AppHeader() {
   const { user, logout } = useContext(AuthContext);
+  const pathname = usePathname();
+  const linkClassName = (href) => `header-nav-link${pathname === href || pathname.startsWith(`${href}/`) ? ' active' : ''}`;
 
   return (
     <header className="header">
@@ -16,11 +19,12 @@ export default function AppHeader() {
           <span>FoodConnect</span>
         </Link>
         <nav className="header-nav" aria-label="Main navigation">
-          <Link href="/menu" className="header-nav-link">Menu</Link>
-          <Link href="/schools" className="header-nav-link">Schools</Link>
-          <Link href="/providers" className="header-nav-link">Providers</Link>
-          {user?.role === 'provider' && <Link href="/providers/schools" className="header-nav-link">School coverage</Link>}
-          {user?.role === 'provider' && <Link href="/orders" className="header-nav-link">Orders</Link>}
+          {user?.role !== 'provider' && <Link href="/menu" className={linkClassName('/menu')}>Menu</Link>}
+          <Link href="/schools" className={linkClassName('/schools')}>Schools</Link>
+          {user?.role !== 'provider' && <Link href="/providers" className={linkClassName('/providers')}>Providers</Link>}
+          {user?.role === 'provider' && <Link href="/providers/menu" className={linkClassName('/providers/menu')}>My menu</Link>}
+          {user?.role === 'provider' && <Link href="/providers/schools" className={linkClassName('/providers/schools')}>School coverage</Link>}
+          {user?.role === 'provider' && <Link href="/orders" className={linkClassName('/orders')}>Orders</Link>}
         </nav>
         <div className="header-actions">
           {user ? (

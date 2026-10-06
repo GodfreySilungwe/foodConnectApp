@@ -97,7 +97,7 @@ export default function ProviderSchoolsPage() {
           <header className="auth-header">
             <span className="auth-icon" aria-hidden="true">⌖</span>
             <h1>Schools you serve</h1>
-            <p className="auth-subtitle">Parents can order for students only at the schools you select.</p>
+            <p className="auth-subtitle">Choose any registered schools to associate with your provider profile.</p>
           </header>
           {authLoading || loading ? <p>Loading school coverage...</p> : !user ? (
             <div className="auth-form">
@@ -114,6 +114,7 @@ export default function ProviderSchoolsPage() {
               {!hasProviderProfile && <div className="form-group"><label htmlFor="provider-name">Provider or kitchen name</label><input id="provider-name" value={providerName} onChange={(event) => setProviderName(event.target.value)} required maxLength={120} disabled={submitting} /></div>}
               <fieldset className="provider-school-options">
                 <legend>Schools you provide food to</legend>
+                <p><Link href="/schools/register">Register a new school</Link></p>
                 {schools.length ? schools.map((school) => (
                   <label className="provider-school-option" key={school.id}>
                     <input type="checkbox" checked={selectedSchoolIds.includes(school.id)} onChange={() => toggleSchool(school.id)} disabled={submitting} />

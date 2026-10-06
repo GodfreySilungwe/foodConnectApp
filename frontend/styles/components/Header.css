@@ -45,21 +45,22 @@
 .header-nav {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  background: rgba(23, 42, 54, 0.03);
-  border: 1px solid rgba(23, 42, 54, 0.05);
-  border-radius: 999px;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  background: rgba(23, 42, 54, 0.055);
+  border: 1px solid rgba(23, 42, 54, 0.08);
+  border-radius: 0.75rem;
 }
 
 .header-nav-link {
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--color-gray-600);
-  padding: 0.58rem 0.8rem;
-  border-radius: 999px;
+  padding: 0.62rem 0.9rem;
+  border-radius: 0.5rem;
   transition: all var(--transition-fast);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .header-nav-link:hover {
@@ -68,8 +69,9 @@
 }
 
 .header-nav-link.active {
-  color: var(--color-primary);
-  background: rgba(217, 101, 59, 0.09);
+  color: var(--color-white);
+  background: var(--color-secondary);
+  box-shadow: 0 2px 5px rgba(23, 42, 54, 0.18);
 }
 
 .header-actions {

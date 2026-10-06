@@ -101,28 +101,6 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <div className="hero-image">
-            <div className="hero-visual">
-              <div className="hero-visual-card hero-card-main">
-                <div className="hero-card-icon">🍔</div>
-                <div className="hero-card-copy">
-                  <strong>Best Seller</strong>
-                  <span>Grilled Chicken Wrap</span>
-                </div>
-                <span className="hero-card-price">$18.90</span>
-              </div>
-
-              <div className="hero-visual-badge">
-                <span className="hero-badge-score">4.9</span>
-                <span className="hero-badge-label">Top rated</span>
-              </div>
-
-              <div className="hero-image-placeholder">
-                <div className="hero-food-plate">🍱</div>
-                <span className="hero-image-label">Fresh Food, Happy People</span>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 

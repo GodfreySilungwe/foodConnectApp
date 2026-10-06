@@ -12,7 +12,7 @@ import '@/styles/pages/Auth.css';
 export default function RegisterSchoolPage() {
   const { user, token, loading: authLoading } = useContext(AuthContext);
   const { showNotification } = useContext(NotificationContext);
-  const [form, setForm] = useState({ name: '', location: '', studentCount: '' });
+  const [form, setForm] = useState({ name: '', location: '', studentCount: '0' });
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
@@ -47,20 +47,20 @@ export default function RegisterSchoolPage() {
           </header>
           {authLoading ? <p>Checking your account...</p> : !user ? (
             <div className="auth-form">
-              <p>Sign in with a school administrator account to register a school.</p>
+              <p>Sign in with a provider or administrator account to register a school.</p>
               <Link href="/register?role=school" className="btn btn-primary btn-lg btn-block">Create school administrator account</Link>
               <Link href="/login" className="auth-link">Already registered? Sign in</Link>
             </div>
-          ) : user.role !== 'school' ? (
+          ) : !['school', 'provider', 'admin'].includes(user.role) ? (
             <div className="auth-form">
-              <p>This form is available to school administrator accounts.</p>
+              <p>This form is available to provider and administrator accounts.</p>
               <Link href="/register?role=school" className="auth-link">Create a school administrator account</Link>
             </div>
           ) : (
             <form className="auth-form" onSubmit={submit}>
               <div className="form-group"><label htmlFor="school-name">School name</label><input id="school-name" value={form.name} onChange={update('name')} required maxLength={120} disabled={submitting} /></div>
               <div className="form-group"><label htmlFor="school-location">City or area</label><input id="school-location" value={form.location} onChange={update('location')} required maxLength={120} disabled={submitting} /></div>
-              <div className="form-group"><label htmlFor="student-count">Approximate student count</label><input id="student-count" type="number" min="0" step="1" value={form.studentCount} onChange={update('studentCount')} disabled={submitting} /></div>
+              <div className="form-group"><label htmlFor="student-count">Approximate student count</label><input id="student-count" type="number" min="0" step="1" value={form.studentCount} onChange={update('studentCount')} disabled={submitting} /><small>Defaults to 0; you can change this estimate.</small></div>
               <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting}>{submitting ? 'Registering school...' : 'Register school'}</button>
             </form>
           )}

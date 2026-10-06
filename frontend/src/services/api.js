@@ -60,6 +60,7 @@ export const api = {
   // Providers
   getProviders: () => request(`${urls.provider}/api/providers`),
   getProvider: (id) => request(`${urls.provider}/api/providers/${id}`),
+  getMyMenu: (token) => request(`${urls.provider}/api/my/menu`, {}, token),
   registerProvider: (provider, token) =>
     request(
       `${urls.provider}/api/providers`,
@@ -92,6 +93,24 @@ export const api = {
       },
       token
     ),
+  updateMenuItem: (providerId, menuId, item, token) =>
+    request(
+      `${urls.provider}/api/providers/${providerId}/menu/${menuId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(item),
+      },
+      token
+    ),
+  updateMenuAvailability: (providerId, menuId, available, token) =>
+    request(
+      `${urls.provider}/api/providers/${providerId}/menu/${menuId}/availability`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ available }),
+      },
+      token
+    ),
 
   // Orders
   createOrder: (order, token) =>
@@ -118,6 +137,7 @@ export const api = {
   // Schools
   getSchools: () => request(`${urls.provider}/api/schools`),
   getSchool: (id) => request(`${urls.provider}/api/schools/${id}`),
+  getSchoolProviders: (id, token) => request(`${urls.provider}/api/schools/${id}/providers`, {}, token),
   registerSchool: (school, token) =>
     request(
       `${urls.provider}/api/schools`,

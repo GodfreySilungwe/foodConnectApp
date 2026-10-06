@@ -9,6 +9,15 @@ const unrelatedCustomerToken = jwt.sign({ userId: 'u-998', role: 'customer' }, '
 const otherProviderToken = jwt.sign({ userId: 'u-998', role: 'provider', providerId: 'p-999' }, 'foodconnect-development-secret');
 
 describe('Order service', () => {
+  it('allows browser preflight for provider status updates', async () => {
+    const response = await request(app)
+      .options('/api/orders/o-1001/status')
+      .set('Access-Control-Request-Method', 'PATCH');
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['access-control-allow-methods']).toContain('PATCH');
+  });
+
   it('creates a new order', async () => {
     const response = await request(app)
       .post('/api/orders')
@@ -36,6 +45,23 @@ describe('Order service', () => {
       schoolId: 's-001',
       foodPreferences: 'No peanuts; mild spice'
     });
+  });
+
+  it('allows parents to order from any provider for any school', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({
+        providerId: 'p-888',
+        items: [{ menuId: 'm-999', quantity: 1, price: 12 }],
+        studentName: 'Jordan Lee',
+        studentClass: 'Year 2',
+        schoolId: 's-999',
+        schoolName: 'Any Registered School'
+      });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.data).toMatchObject({ providerId: 'p-888', schoolId: 's-999' });
   });
 
   it('rejects order without required fields', async () => {
