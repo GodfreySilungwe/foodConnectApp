@@ -12,6 +12,7 @@ import MenuGrid from '@/components/menu/MenuGrid';
 import SearchField from '@/components/common/SearchField';
 import { matchesSearch } from '@/utils/search';
 import { compressImage } from '@/utils/images';
+import LocationPicker from '@/components/common/LocationPicker';
 import '@/styles/components/ProfileImageUpload.css';
 
 export default function SchoolDetailsPage() {
@@ -25,6 +26,8 @@ export default function SchoolDetailsPage() {
   const [providersError, setProvidersError] = useState('');
   const [query, setQuery] = useState('');
   const [schoolImage, setSchoolImage] = useState('');
+  const [schoolLocation, setSchoolLocation] = useState('');
+  const [coordinates, setCoordinates] = useState({ latitude: null, longitude: null });
   const [savingImage, setSavingImage] = useState(false);
 
   useEffect(() => {
@@ -36,6 +39,11 @@ export default function SchoolDetailsPage() {
         if (!active) return;
         setSchool(schoolResult.data);
         setSchoolImage(schoolResult.data.image || '');
+        setSchoolLocation(schoolResult.data.location || '');
+        setCoordinates({
+          latitude: schoolResult.data.latitude ?? null,
+          longitude: schoolResult.data.longitude ?? null,
+        });
         setAllSchools(schoolsResult.data || []);
         const registeredProviders = providerResult.data || [];
         const providerMenus = await Promise.all(registeredProviders.map(async (provider) => {
@@ -77,9 +85,17 @@ export default function SchoolDetailsPage() {
 
   const saveSchoolImage = async (event) => {
     event.preventDefault();
+    if (!schoolLocation.trim() || !Number.isFinite(coordinates.latitude) || !Number.isFinite(coordinates.longitude)) {
+      showNotification('Enter a school location and select its map pin.', 'warning');
+      return;
+    }
     setSavingImage(true);
     try {
-      const result = await api.updateSchool(schoolId, { image: schoolImage || null }, token);
+      const result = await api.updateSchool(schoolId, {
+        image: schoolImage || null,
+        location: schoolLocation,
+        ...coordinates,
+      }, token);
       setSchool(result.data);
       showNotification('School image updated.', 'success');
     } catch (requestError) {
@@ -103,14 +119,17 @@ export default function SchoolDetailsPage() {
       {providersError && <p role="alert">{providersError}</p>}
       {school && <div className="page-heading"><p className="eyebrow">Community partner</p><h1>{school.name}</h1><p>{school.location} · {school.studentCount} students</p>{school.image && <img className="school-profile-image" src={school.image} alt={`${school.name} campus`} />}</div>}
       {school && (user?.role === 'admin' || school.registeredBy === user?.userId) && <form className="school-image-editor" onSubmit={saveSchoolImage}>
+        <label htmlFor="school-edit-location">School location</label>
+        <input id="school-edit-location" value={schoolLocation} onChange={(event) => setSchoolLocation(event.target.value)} required maxLength={160} placeholder="Town, district, or address" disabled={savingImage} />
+        <LocationPicker value={coordinates} onChange={setCoordinates} label="Update school map pin" />
         <label htmlFor="school-card-image">School card image</label>
         <input id="school-card-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectSchoolImage} disabled={savingImage} />
         {schoolImage && <img src={schoolImage} alt="School image preview" />}
-        <button className="btn btn-sm" type="submit" disabled={savingImage}>{savingImage ? 'Saving...' : 'Save school image'}</button>
+        <button className="btn btn-sm" type="submit" disabled={savingImage}>{savingImage ? 'Saving...' : 'Save school location and image'}</button>
       </form>}
       {school && <section>
         <h2>Registered food providers</h2>
-        <SearchField value={query} onChange={setQuery} placeholder="Search providers or dishes" label="Search providers and menus at this school" />
+        <SearchField value={query} onChange={setQuery} placeholder="Search this school, providers, or dishes" label="Search school providers and menus" />
         {providersLoading ? <p>Loading providers...</p> : visibleProviders.length ? (
           <ul>
             {visibleProviders.map((provider) => {

@@ -4,6 +4,22 @@ const { requireAuth } = require('./auth');
 
 const createApp = () => {
   const app = express();
+  const validCoordinates = (latitude, longitude) => {
+    const coordinatesMissing = (latitude === undefined || latitude === null) && (longitude === undefined || longitude === null);
+    return coordinatesMissing || (
+      typeof latitude === 'number' && Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 &&
+      typeof longitude === 'number' && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
+    );
+  };
+  const distanceKmBetween = (first, second) => {
+    if (!Number.isFinite(first.latitude) || !Number.isFinite(first.longitude) || !Number.isFinite(second.latitude) || !Number.isFinite(second.longitude)) return null;
+    const radians = (degrees) => degrees * Math.PI / 180;
+    const latitudeDelta = radians(second.latitude - first.latitude);
+    const longitudeDelta = radians(second.longitude - first.longitude);
+    const haversine = Math.sin(latitudeDelta / 2) ** 2 +
+      Math.cos(radians(first.latitude)) * Math.cos(radians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
+    return Math.round(6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)) * 10) / 10;
+  };
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_ORIGIN || 'http://localhost:3000');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -56,9 +72,21 @@ const createApp = () => {
     return items.map((item) => {
       const provider = providerById.get(item.providerId);
       const schoolIds = provider?.schoolIds || [];
+      const providerLocation = provider && Number.isFinite(provider.latitude) && Number.isFinite(provider.longitude)
+        ? { latitude: provider.latitude, longitude: provider.longitude }
+        : null;
       return {
         ...item,
-        availableSchools: schools.filter((school) => schoolIds.includes(school.id)).map(({ id, name }) => ({ id, name }))
+        providerLocation,
+        availableSchools: schools.filter((school) => schoolIds.includes(school.id)).map((school) => {
+          const distanceKm = providerLocation ? distanceKmBetween(providerLocation, school) : null;
+          return {
+            id: school.id,
+            name: school.name,
+            distanceKm,
+            estimatedMinutes: distanceKm === null ? null : Math.max(5, Math.round((distanceKm * 1.3 / 25) * 60))
+          };
+        })
       };
     });
   };
@@ -148,9 +176,12 @@ const createApp = () => {
       return res.status(403).json({ success: false, error: 'Only administrators and providers can register schools' });
     }
 
-    const { name, location, studentCount, image } = req.body || {};
+    const { name, location, studentCount, image, latitude, longitude } = req.body || {};
     if (!name || !location) {
       return res.status(400).json({ success: false, error: 'School name and location are required' });
+    }
+    if (!validCoordinates(latitude, longitude)) {
+      return res.status(400).json({ success: false, error: 'A valid latitude and longitude pair is required' });
     }
     if (!isValidProfileImage(image)) {
       return res.status(400).json({ success: false, error: 'School image must be one valid image under 160 KB' });
@@ -167,6 +198,8 @@ const createApp = () => {
       location: location.trim(),
       studentCount: Number(studentCount) || 0,
       image: image || null,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
       providerCount: 0,
       registeredBy: req.user.userId
     };
@@ -205,16 +238,20 @@ const createApp = () => {
       return res.status(403).json({ success: false, error: 'School administrator does not own this school record' });
     }
 
-    const { name, location, studentCount, image } = req.body || {};
+    const { name, location, studentCount, image, latitude, longitude } = req.body || {};
     if (!isValidProfileImage(image)) {
       return res.status(400).json({ success: false, error: 'School image must be one valid image under 160 KB' });
+    }
+    if (!validCoordinates(latitude, longitude)) {
+      return res.status(400).json({ success: false, error: 'A valid latitude and longitude pair is required' });
     }
     const updatedSchool = {
       ...school,
       ...(typeof name === 'string' && name.trim() ? { name: name.trim() } : {}),
       ...(typeof location === 'string' && location.trim() ? { location: location.trim() } : {}),
       ...(studentCount !== undefined ? { studentCount: Number(studentCount) || 0 } : {}),
-      ...(image !== undefined ? { image: image || null } : {})
+      ...(image !== undefined ? { image: image || null } : {}),
+      ...(latitude !== undefined && longitude !== undefined ? { latitude, longitude } : {})
     };
     await schoolRepository.save(updatedSchool);
     return res.json({ success: true, data: updatedSchool, message: 'School details updated' });
@@ -225,13 +262,13 @@ const createApp = () => {
   });
 
   app.post('/api/providers', requireAuth('provider'), async (req, res) => {
-    const { name, ownerName, email, status, schoolIds = [], description = '', image = null } = req.body || {};
+    const { name, ownerName, email, status, schoolIds = [], description = '', image = null, location = '', latitude = null, longitude = null } = req.body || {};
 
     if (await providerRepository.findByOwnerUserId(req.user.userId) || await providerRepository.findById(req.user.providerId)) {
       return res.status(409).json({ success: false, error: 'Provider account may register only one provider' });
     }
 
-    if (!name || !ownerName || !email || !Array.isArray(schoolIds) || typeof description !== 'string' || !isValidProfileImage(image)) {
+    if (!name || !ownerName || !email || !Array.isArray(schoolIds) || typeof description !== 'string' || typeof location !== 'string' || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
@@ -252,6 +289,9 @@ const createApp = () => {
       email,
       description: description.trim(),
       image,
+      location: location.trim(),
+      latitude,
+      longitude,
       status: status || 'active',
       ownerUserId: req.user.userId,
       schoolIds: [...new Set(schoolIds)]
@@ -277,15 +317,17 @@ const createApp = () => {
       return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
     }
 
-    const { name, description, image } = req.body || {};
-    if ((name !== undefined && (typeof name !== 'string' || !name.trim())) || (description !== undefined && typeof description !== 'string') || !isValidProfileImage(image)) {
+    const { name, description, image, location, latitude, longitude } = req.body || {};
+    if ((name !== undefined && (typeof name !== 'string' || !name.trim())) || (description !== undefined && typeof description !== 'string') || (location !== undefined && typeof location !== 'string') || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
       return res.status(400).json({ success: false, error: 'Provider details or image are invalid' });
     }
     const updatedProvider = {
       ...provider,
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(description !== undefined ? { description: description.trim() } : {}),
-      ...(image !== undefined ? { image: image || null } : {})
+      ...(image !== undefined ? { image: image || null } : {}),
+      ...(location !== undefined ? { location: location.trim() } : {}),
+      ...(latitude !== undefined && longitude !== undefined ? { latitude, longitude } : {})
     };
     await providerRepository.save(updatedProvider);
     return res.json({ success: true, data: updatedProvider, message: 'Provider profile updated' });

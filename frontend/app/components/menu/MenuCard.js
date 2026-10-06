@@ -47,7 +47,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
       return;
     }
 
-    setShowCheckout(true);
+          <p className="menu-card-description">Available at: {item.availableSchools.length ? item.availableSchools.map((school) => `${school.name}${school.distanceKm !== null && school.distanceKm !== undefined ? ` · ${school.distanceKm} km · about ${school.estimatedMinutes} min` : ''}`).join(', ') : 'No registered schools'}</p>
     if (isLoadingSchools) return;
     setIsLoadingSchools(true);
     setSchoolError('');
@@ -231,7 +231,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
           </div>}
         </>}
         {Array.isArray(item.availableSchools) && (
-          <p className="menu-card-description">Available at: {item.availableSchools.length ? item.availableSchools.map((school) => school.name).join(', ') : 'No registered schools'}</p>
+          <p className="menu-card-description">Available at: {item.availableSchools.length ? item.availableSchools.map((school) => `${school.name}${school.distanceKm !== null && school.distanceKm !== undefined ? ` · ${school.distanceKm} km · approx. ${school.estimatedMinutes} min delivery` : ''}`).join(', ') : 'No registered schools'}</p>
         )}
         {providerControls ? <div className="menu-card-provider-controls">
           <label className="menu-card-availability">

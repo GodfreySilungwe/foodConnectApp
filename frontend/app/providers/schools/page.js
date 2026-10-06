@@ -9,6 +9,7 @@ import AppHeader from '@/components/common/AppHeader';
 import SearchField from '@/components/common/SearchField';
 import { compressImage } from '@/utils/images';
 import { matchesSearch } from '@/utils/search';
+import LocationPicker from '@/components/common/LocationPicker';
 import '@/styles/pages/Auth.css';
 import '@/styles/pages/ProviderSchools.css';
 import '@/styles/components/ProfileImageUpload.css';
@@ -21,6 +22,8 @@ export default function ProviderSchoolsPage() {
   const [providerName, setProviderName] = useState('');
   const [providerDescription, setProviderDescription] = useState('');
   const [providerImage, setProviderImage] = useState('');
+  const [providerLocation, setProviderLocation] = useState('');
+  const [coordinates, setCoordinates] = useState({ latitude: null, longitude: null });
   const [schoolQuery, setSchoolQuery] = useState('');
   const [hasProviderProfile, setHasProviderProfile] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,6 +53,11 @@ export default function ProviderSchoolsPage() {
             setProviderName(providerResult.data.name || user.name || '');
             setProviderDescription(providerResult.data.description || '');
             setProviderImage(providerResult.data.image || '');
+            setProviderLocation(providerResult.data.location || '');
+            setCoordinates({
+              latitude: providerResult.data.latitude ?? null,
+              longitude: providerResult.data.longitude ?? null,
+            });
             setSelectedSchoolIds(providerResult.data.schoolIds || []);
           } catch (providerError) {
             if (providerError.message !== 'Provider not found') throw providerError;
@@ -85,8 +93,16 @@ export default function ProviderSchoolsPage() {
 
   const submit = async (event) => {
     event.preventDefault();
+    if (!providerLocation.trim() || !Number.isFinite(coordinates.latitude) || !Number.isFinite(coordinates.longitude)) {
+      showNotification('Enter a provider location and select its map pin.', 'warning');
+      return;
+    }
     if (!selectedSchoolIds.length) {
       showNotification('Select at least one school you serve.', 'warning');
+      return;
+    }
+    if (!providerLocation.trim() || !Number.isFinite(coordinates.latitude) || !Number.isFinite(coordinates.longitude)) {
+      showNotification('Enter a provider location and select its map pin.', 'warning');
       return;
     }
     setSubmitting(true);
@@ -96,6 +112,8 @@ export default function ProviderSchoolsPage() {
           name: providerName,
           description: providerDescription,
           image: providerImage || null,
+          location: providerLocation,
+          ...coordinates,
         }, token);
         await api.updateProviderSchools(user.providerId, selectedSchoolIds, token);
       } else {
@@ -106,6 +124,8 @@ export default function ProviderSchoolsPage() {
           schoolIds: selectedSchoolIds,
           description: providerDescription,
           image: providerImage || null,
+          location: providerLocation,
+          ...coordinates,
         }, token);
         setHasProviderProfile(true);
       }
@@ -142,12 +162,14 @@ export default function ProviderSchoolsPage() {
             <form className="auth-form" onSubmit={submit}>
               <div className="form-group"><label htmlFor="provider-name">Provider or kitchen name</label><input id="provider-name" value={providerName} onChange={(event) => setProviderName(event.target.value)} required maxLength={120} disabled={submitting} /></div>
               <div className="form-group"><label htmlFor="provider-description">Short description or advert</label><textarea id="provider-description" value={providerDescription} onChange={(event) => setProviderDescription(event.target.value)} maxLength={240} rows={3} placeholder="Describe your kitchen or today's offer" disabled={submitting} /></div>
+              <div className="form-group"><label htmlFor="provider-location">Provider location</label><input id="provider-location" value={providerLocation} onChange={(event) => setProviderLocation(event.target.value)} required maxLength={160} placeholder="Town, district, or address" disabled={submitting} /></div>
+              <LocationPicker value={coordinates} onChange={setCoordinates} label="Select your provider location" />
               <div className="form-group"><label htmlFor="provider-image">Provider card image</label><input id="provider-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectProviderImage} disabled={submitting} /><small>Choose one image; it will be cropped and compressed.</small></div>
               {providerImage && <div className="profile-image-preview"><img src={providerImage} alt="Provider card preview" /><button type="button" onClick={() => setProviderImage('')} disabled={submitting}>Remove image</button></div>}
               <fieldset className="provider-school-options">
                 <legend>Schools you provide food to</legend>
                 <p><Link href="/schools/register">Register a new school</Link></p>
-                {schools.length > 4 && <SearchField value={schoolQuery} onChange={setSchoolQuery} placeholder="Filter schools" label="Filter schools you serve" />}
+                {schools.length > 4 && <SearchField value={schoolQuery} onChange={setSchoolQuery} placeholder="Search schools by name or location" label="Search schools you serve" />}
                 {filteredSchools.length ? filteredSchools.map((school) => (
                   <label className="provider-school-option" key={school.id}>
                     <input type="checkbox" checked={selectedSchoolIds.includes(school.id)} onChange={() => toggleSchool(school.id)} disabled={submitting} />

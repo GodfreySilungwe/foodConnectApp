@@ -8,13 +8,14 @@ import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 import AppHeader from '@/components/common/AppHeader';
 import { compressImage } from '@/utils/images';
+import LocationPicker from '@/components/common/LocationPicker';
 import '@/styles/pages/Auth.css';
 import '@/styles/components/ProfileImageUpload.css';
 
 export default function RegisterSchoolPage() {
   const { user, token, loading: authLoading } = useContext(AuthContext);
   const { showNotification } = useContext(NotificationContext);
-  const [form, setForm] = useState({ name: '', location: '', studentCount: '0', image: '' });
+  const [form, setForm] = useState({ name: '', location: '', studentCount: '0', image: '', latitude: null, longitude: null });
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
@@ -34,6 +35,10 @@ export default function RegisterSchoolPage() {
 
   const submit = async (event) => {
     event.preventDefault();
+    if (!Number.isFinite(form.latitude) || !Number.isFinite(form.longitude)) {
+      showNotification('Choose the school location on the map or use your current location.', 'warning');
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await api.registerSchool({
@@ -41,6 +46,8 @@ export default function RegisterSchoolPage() {
         location: form.location,
         studentCount: Number(form.studentCount) || 0,
         image: form.image || null,
+        latitude: form.latitude,
+        longitude: form.longitude,
       }, token);
       showNotification('School registered successfully.', 'success');
       router.push(`/schools/${result.data.id}`);
@@ -74,7 +81,8 @@ export default function RegisterSchoolPage() {
           ) : (
             <form className="auth-form" onSubmit={submit}>
               <div className="form-group"><label htmlFor="school-name">School name</label><input id="school-name" value={form.name} onChange={update('name')} required maxLength={120} disabled={submitting} /></div>
-              <div className="form-group"><label htmlFor="school-location">City or area</label><input id="school-location" value={form.location} onChange={update('location')} required maxLength={120} disabled={submitting} /></div>
+              <div className="form-group"><label htmlFor="school-location">Town, district, or address</label><input id="school-location" value={form.location} onChange={update('location')} required maxLength={160} disabled={submitting} /></div>
+              <LocationPicker value={{ latitude: form.latitude, longitude: form.longitude }} onChange={(coordinates) => setForm((current) => ({ ...current, ...coordinates }))} label="Select the school location" />
               <div className="form-group"><label htmlFor="student-count">Approximate student count</label><input id="student-count" type="number" min="0" step="1" value={form.studentCount} onChange={update('studentCount')} disabled={submitting} /><small>Defaults to 0; you can change this estimate.</small></div>
               <div className="form-group"><label htmlFor="school-image">School card image</label><input id="school-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectImage} disabled={submitting} /><small>Choose one image; it will be cropped and compressed.</small></div>
               {form.image && <div className="profile-image-preview"><img src={form.image} alt="School card preview" /><button type="button" onClick={() => setForm((current) => ({ ...current, image: '' }))} disabled={submitting}>Remove image</button></div>}

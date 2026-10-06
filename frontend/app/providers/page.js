@@ -10,12 +10,16 @@ import { matchesSearch } from '@/utils/search';
 
 export default function ProvidersPage() {
   const [providers, setProviders] = useState([]);
+  const [schools, setSchools] = useState([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.getProviders()
-      .then((result) => setProviders(result.data || []))
+    Promise.all([api.getProviders(), api.getSchools()])
+      .then(([providerResult, schoolResult]) => {
+        setProviders(providerResult.data || []);
+        setSchools(schoolResult.data || []);
+      })
       .catch((requestError) => setError(requestError.message));
   }, []);
 
@@ -24,14 +28,15 @@ export default function ProvidersPage() {
     provider.name,
     provider.ownerName,
     provider.description,
-    provider.location
+    provider.location,
+    schools.filter((school) => (provider.schoolIds || []).includes(school.id)).map((school) => school.name).join(' ')
   ));
 
   return (
     <><AppHeader /><main className="container page-content">
       <Link href="/" className="page-back">Back to home</Link>
       <div className="page-heading"><p className="eyebrow">The local network</p><h1>Food providers</h1><p>Find reliable kitchens and community partners near you.</p></div>
-      <SearchField value={query} onChange={setQuery} placeholder="Search providers" label="Search providers" />
+      <SearchField value={query} onChange={setQuery} placeholder="Search providers or schools" label="Search providers and associated schools" />
       {error ? <p>{error}</p> : (
         filteredProviders.length ? <div className="provider-grid">
           {filteredProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}

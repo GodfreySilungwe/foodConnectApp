@@ -59,6 +59,40 @@ describe('Provider service', () => {
     expect(unauthorizedResponse.statusCode).toBe(403);
   });
 
+  it('returns distance and approximate delivery time for located provider-school pairs', async () => {
+    const schoolResponse = await request(app)
+      .post('/api/schools')
+      .set('Authorization', `Bearer ${schoolToken}`)
+      .send({ name: 'Travel Estimate School', location: 'Lilongwe', latitude: -13.96, longitude: 33.77 });
+    expect(schoolResponse.statusCode).toBe(201);
+
+    const providerLocationResponse = await request(app)
+      .put('/api/providers/p-001/profile')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ location: 'Blantyre', latitude: -15.7861, longitude: 35.0058 });
+    expect(providerLocationResponse.statusCode).toBe(200);
+
+    const coverageResponse = await request(app)
+      .put('/api/providers/p-001/schools')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ schoolIds: [schoolResponse.body.data.id] });
+    expect(coverageResponse.statusCode).toBe(200);
+
+    const menuResponse = await request(app).get('/api/providers/p-001/menu');
+    const associatedSchool = menuResponse.body.data[0].availableSchools[0];
+    expect(associatedSchool.distanceKm).toBeGreaterThan(0);
+    expect(associatedSchool.estimatedMinutes).toBeGreaterThan(0);
+
+    await request(app)
+      .put('/api/providers/p-001/profile')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ location: '', latitude: null, longitude: null });
+    await request(app)
+      .put('/api/providers/p-001/schools')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ schoolIds: ['s-001'] });
+  });
+
   it('allows providers to update their profile description and card image', async () => {
     const response = await request(app)
       .put('/api/providers/p-001/profile')

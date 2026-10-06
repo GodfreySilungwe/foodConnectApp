@@ -169,7 +169,7 @@ export default function ProviderMenuPage() {
         </section>
         <section className="provider-menu-list">
           <h2>Current menu <span>{items.length}</span></h2>
-          <SearchField value={query} onChange={setQuery} placeholder="Search your menu items" label="Search your menu" />
+          <SearchField value={query} onChange={setQuery} placeholder="Search menu items or schools" label="Search your menu and schools" />
           {error ? <p role="alert">{error}</p> : filteredItems.length ? <MenuGrid items={filteredItems} providerControls onAvailabilityChange={updateAvailability} onEditItem={editMenuItem} /> : <p>{items.length ? 'No menu items match your search.' : 'Your menu is empty.'}</p>}
         </section>
       </>}
