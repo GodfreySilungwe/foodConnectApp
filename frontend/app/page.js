@@ -85,6 +85,9 @@ export default function HomePage() {
               <Link href="/providers" className="btn btn-outline btn-lg">
                 Find Providers
               </Link>
+              <Link href="/schools" className="btn btn-outline btn-lg">
+                Choose Your School
+              </Link>
             </div>
             <div className="hero-stats">
               <div>

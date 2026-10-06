@@ -2,7 +2,8 @@
 .hero {
   background: linear-gradient(135deg, #fff6ef 0%, #fffefb 35%, #f7f5f1 100%);
   padding: 4.8rem 0 4rem;
-  min-height: 610px;
+  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100svh - var(--header-height));
   display: flex;
   align-items: center;
   position: relative;
@@ -404,7 +405,8 @@
 @media (max-width: 768px) {
   .hero {
     padding: 4rem 0 3rem;
-    min-height: auto;
+    min-height: calc(100vh - var(--header-height));
+    min-height: calc(100svh - var(--header-height));
   }
   
   .hero-title {
