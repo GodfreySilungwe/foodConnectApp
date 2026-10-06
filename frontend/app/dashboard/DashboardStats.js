@@ -1,6 +1,7 @@
 'use client';
 
 import '@/styles/components/DashboardStarts.css';
+import { formatMWK } from '@/utils/formatCurrency';
 
 export default function DashboardStats({ stats }) {
   const statItems = [
@@ -8,7 +9,7 @@ export default function DashboardStats({ stats }) {
     { icon: '🏫', label: 'Total Schools', value: stats.totalSchools || 0 },
     { icon: '📦', label: 'Total Orders', value: stats.totalOrders || 0 },
     { icon: '🔄', label: 'Active Orders', value: stats.activeOrders || 0 },
-    { icon: '💰', label: 'Revenue', value: stats.revenue ? `$${stats.revenue.toFixed(2)}` : '$0.00' },
+    { icon: '💰', label: 'Revenue', value: formatMWK(stats.revenue) },
     { icon: '👥', label: 'Active Users', value: stats.activeUsers || 0 },
   ];
 

@@ -1,0 +1,38 @@
+.profile-image-preview,
+.school-image-editor {
+  display: grid;
+  justify-items: start;
+  gap: 0.55rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.profile-image-preview img,
+.school-image-editor img {
+  display: block;
+  width: min(100%, 240px);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--color-gray-100);
+}
+
+.profile-image-preview button,
+.school-image-editor button {
+  border: 0;
+  padding: 0.25rem 0;
+  background: transparent;
+  color: var(--color-primary-dark);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.school-profile-image {
+  display: block;
+  width: min(100%, 520px);
+  max-height: 280px;
+  margin-top: 1rem;
+  object-fit: cover;
+  border-radius: 6px;
+}

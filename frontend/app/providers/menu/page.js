@@ -7,32 +7,13 @@ import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 import MenuGrid from '@/components/menu/MenuGrid';
 import AppHeader from '@/components/common/AppHeader';
+import SearchField from '@/components/common/SearchField';
+import { compressImage } from '@/utils/images';
+import { matchesSearch } from '@/utils/search';
 import '@/styles/pages/ProviderMenu.css';
 
 const MAX_IMAGES = 4;
 const MAX_IMAGE_LENGTH = 60000;
-
-async function compressImage(file) {
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    throw new Error(`${file.name} is not a supported image type`);
-  }
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 960 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-
-  let quality = 0.78;
-  let image = canvas.toDataURL('image/jpeg', quality);
-  while (image.length > MAX_IMAGE_LENGTH && quality > 0.42) {
-    quality -= 0.08;
-    image = canvas.toDataURL('image/jpeg', quality);
-  }
-  if (image.length > MAX_IMAGE_LENGTH) throw new Error(`${file.name} is too large after compression`);
-  return image;
-}
 
 export default function ProviderMenuPage() {
   const { user, token, loading: authLoading } = useContext(AuthContext);
@@ -41,6 +22,7 @@ export default function ProviderMenuPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
   const [editingItemId, setEditingItemId] = useState('');
   const [draft, setDraft] = useState({ name: '', description: '', price: '', images: [], available: true });
 
@@ -74,7 +56,7 @@ export default function ProviderMenuPage() {
     }
 
     try {
-      const compressedImages = await Promise.all(files.map(compressImage));
+      const compressedImages = await Promise.all(files.map((file) => compressImage(file, MAX_IMAGE_LENGTH)));
       const allImages = [...draft.images, ...compressedImages];
       if (allImages.reduce((total, image) => total + image.length, 0) > 240000) {
         throw new Error('The selected images exceed the total upload limit. Choose smaller images.');
@@ -134,6 +116,13 @@ export default function ProviderMenuPage() {
     setDraft({ name: '', description: '', price: '', images: [], available: true });
   };
 
+  const filteredItems = items.filter((item) => matchesSearch(
+    query,
+    item.name,
+    item.description,
+    item.availableSchools?.map((school) => school.name).join(' ')
+  ));
+
   const updateAvailability = async (item, available) => {
     try {
       const result = await api.updateMenuAvailability(user.providerId, item.id, available, token);
@@ -160,7 +149,7 @@ export default function ProviderMenuPage() {
             <label className="provider-menu-field">Description
               <textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} maxLength={500} rows={3} disabled={submitting} />
             </label>
-            <label className="provider-menu-field">Price
+            <label className="provider-menu-field">Price (MWK)
               <input type="number" min="0" step="0.01" value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} required disabled={submitting} />
             </label>
             <label className="provider-menu-field">Dish photos
@@ -180,7 +169,8 @@ export default function ProviderMenuPage() {
         </section>
         <section className="provider-menu-list">
           <h2>Current menu <span>{items.length}</span></h2>
-          {error ? <p role="alert">{error}</p> : items.length ? <MenuGrid items={items} providerControls onAvailabilityChange={updateAvailability} onEditItem={editMenuItem} /> : <p>Your menu is empty.</p>}
+          <SearchField value={query} onChange={setQuery} placeholder="Search your menu items" label="Search your menu" />
+          {error ? <p role="alert">{error}</p> : filteredItems.length ? <MenuGrid items={filteredItems} providerControls onAvailabilityChange={updateAvailability} onEditItem={editMenuItem} /> : <p>{items.length ? 'No menu items match your search.' : 'Your menu is empty.'}</p>}
         </section>
       </>}
     </main></>

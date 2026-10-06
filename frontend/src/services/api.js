@@ -61,6 +61,12 @@ export const api = {
   getProviders: () => request(`${urls.provider}/api/providers`),
   getProvider: (id) => request(`${urls.provider}/api/providers/${id}`),
   getMyMenu: (token) => request(`${urls.provider}/api/my/menu`, {}, token),
+  updateProviderProfile: (providerId, profile, token) =>
+    request(
+      `${urls.provider}/api/providers/${providerId}/profile`,
+      { method: 'PUT', body: JSON.stringify(profile) },
+      token
+    ),
   registerProvider: (provider, token) =>
     request(
       `${urls.provider}/api/providers`,
@@ -138,6 +144,8 @@ export const api = {
   getSchools: () => request(`${urls.provider}/api/schools`),
   getSchool: (id) => request(`${urls.provider}/api/schools/${id}`),
   getSchoolProviders: (id, token) => request(`${urls.provider}/api/schools/${id}/providers`, {}, token),
+  updateSchool: (id, school, token) =>
+    request(`${urls.provider}/api/schools/${id}`, { method: 'PUT', body: JSON.stringify(school) }, token),
   registerSchool: (school, token) =>
     request(
       `${urls.provider}/api/schools`,

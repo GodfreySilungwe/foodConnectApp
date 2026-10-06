@@ -3,17 +3,29 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useContext } from 'react';
+import { AuthContext } from '@/contexts/AuthContext';
+import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 import AppHeader from '@/components/common/AppHeader';
 import MenuGrid from '@/components/menu/MenuGrid';
+import SearchField from '@/components/common/SearchField';
+import { matchesSearch } from '@/utils/search';
+import { compressImage } from '@/utils/images';
+import '@/styles/components/ProfileImageUpload.css';
 
 export default function SchoolDetailsPage() {
   const { schoolId } = useParams();
+  const { user, token } = useContext(AuthContext);
+  const { showNotification } = useContext(NotificationContext);
   const [school, setSchool] = useState(null);
   const [providers, setProviders] = useState([]);
   const [allSchools, setAllSchools] = useState([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providersError, setProvidersError] = useState('');
+  const [query, setQuery] = useState('');
+  const [schoolImage, setSchoolImage] = useState('');
+  const [savingImage, setSavingImage] = useState(false);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -23,6 +35,7 @@ export default function SchoolDetailsPage() {
       .then(async ([schoolResult, providerResult, schoolsResult]) => {
         if (!active) return;
         setSchool(schoolResult.data);
+        setSchoolImage(schoolResult.data.image || '');
         setAllSchools(schoolsResult.data || []);
         const registeredProviders = providerResult.data || [];
         const providerMenus = await Promise.all(registeredProviders.map(async (provider) => {
@@ -51,25 +64,64 @@ export default function SchoolDetailsPage() {
     return () => { active = false; };
   }, [schoolId]);
 
+  const selectSchoolImage = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      setSchoolImage(await compressImage(file, 150000));
+    } catch (imageError) {
+      showNotification(imageError.message || 'Could not process school image', 'error');
+    }
+  };
+
+  const saveSchoolImage = async (event) => {
+    event.preventDefault();
+    setSavingImage(true);
+    try {
+      const result = await api.updateSchool(schoolId, { image: schoolImage || null }, token);
+      setSchool(result.data);
+      showNotification('School image updated.', 'success');
+    } catch (requestError) {
+      showNotification(requestError.message || 'Could not update school image', 'error');
+    } finally {
+      setSavingImage(false);
+    }
+  };
+
+  const visibleProviders = providers.map((provider) => {
+    const providerSchools = allSchools.filter((entry) => (provider.schoolIds || []).includes(entry.id));
+    const providerMatches = matchesSearch(query, provider.name, provider.description, providerSchools.map((entry) => entry.name).join(' '));
+    const menu = provider.menu || [];
+    const matchedMenu = menu.filter((item) => matchesSearch(query, item.name, item.description));
+    return { ...provider, providerSchools, visibleMenu: providerMatches ? menu : matchedMenu, providerMatches };
+  }).filter((provider) => provider.providerMatches || provider.visibleMenu.length > 0);
+
   return (
     <><AppHeader /><main className="container page-content">
       <Link href="/" className="page-back">Back to home</Link>
       {providersError && <p role="alert">{providersError}</p>}
-      {school && <div className="page-heading"><p className="eyebrow">Community partner</p><h1>{school.name}</h1><p>{school.location} · {school.studentCount} students</p></div>}
+      {school && <div className="page-heading"><p className="eyebrow">Community partner</p><h1>{school.name}</h1><p>{school.location} · {school.studentCount} students</p>{school.image && <img className="school-profile-image" src={school.image} alt={`${school.name} campus`} />}</div>}
+      {school && (user?.role === 'admin' || school.registeredBy === user?.userId) && <form className="school-image-editor" onSubmit={saveSchoolImage}>
+        <label htmlFor="school-card-image">School card image</label>
+        <input id="school-card-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectSchoolImage} disabled={savingImage} />
+        {schoolImage && <img src={schoolImage} alt="School image preview" />}
+        <button className="btn btn-sm" type="submit" disabled={savingImage}>{savingImage ? 'Saving...' : 'Save school image'}</button>
+      </form>}
       {school && <section>
         <h2>Registered food providers</h2>
-        {providersLoading ? <p>Loading providers...</p> : providers.length ? (
+        <SearchField value={query} onChange={setQuery} placeholder="Search providers or dishes" label="Search providers and menus at this school" />
+        {providersLoading ? <p>Loading providers...</p> : visibleProviders.length ? (
           <ul>
-            {providers.map((provider) => {
-              const providerSchools = allSchools.filter((entry) => (provider.schoolIds || []).includes(entry.id));
+            {visibleProviders.map((provider) => {
               return <li className="school-provider" key={provider.id}>
                 <h3><Link href={`/providers/${provider.id}`}>{provider.name}</Link></h3>
-                {providerSchools.length > 0 && <p>Registered schools: {providerSchools.map((entry, index) => <span key={entry.id}>{index > 0 ? ', ' : ''}<Link href={`/schools/${entry.id}`}>{entry.name}</Link></span>)}</p>}
-                {provider.menu.length ? <MenuGrid items={provider.menu} showProvider /> : <p>No available menu items at this school.</p>}
+                {provider.providerSchools.length > 0 && <p>Registered schools: {provider.providerSchools.map((entry, index) => <span key={entry.id}>{index > 0 ? ', ' : ''}<Link href={`/schools/${entry.id}`}>{entry.name}</Link></span>)}</p>}
+                {provider.visibleMenu.length ? <MenuGrid items={provider.visibleMenu} showProvider /> : <p>No available menu items at this school.</p>}
               </li>;
             })}
           </ul>
-        ) : <p>No providers are registered for this school yet.</p>}
+        ) : <p>No providers or dishes match your search.</p>}
       </section>}
     </main></>
   );

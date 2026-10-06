@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
+import { formatMWK } from '@/utils/formatCurrency';
 import Link from 'next/link';
 import '@/styles/components/MenuCard.css';
 
@@ -28,6 +29,17 @@ export default function MenuCard({ item, showProvider = false, providerControls 
   const [schoolError, setSchoolError] = useState('');
   const [isLoadingSchools, setIsLoadingSchools] = useState(false);
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
+
+  const expandCardImages = (event) => {
+    if (!images.length || event.target.closest('a, button, input, label, select, textarea')) return;
+    setShowAllImages(true);
+  };
+
+  const handleCardKeyDown = (event) => {
+    if (event.target !== event.currentTarget || !['Enter', ' '].includes(event.key)) return;
+    event.preventDefault();
+    setShowAllImages(true);
+  };
 
   const openCheckout = async () => {
     if (user && user.role !== 'customer') {
@@ -165,7 +177,13 @@ export default function MenuCard({ item, showProvider = false, providerControls 
 
   return (
     <>
-    <div className="menu-card">
+    <article
+      className={`menu-card${images.length ? ' menu-card-has-images' : ''}`}
+      onClick={expandCardImages}
+      onKeyDown={handleCardKeyDown}
+      tabIndex={images.length ? 0 : undefined}
+      aria-label={images.length ? `${item.name}. Activate to expand photos.` : undefined}
+    >
       <div className="menu-card-image">
         {images.length ? (
           <img src={images[Math.min(activeImageIndex, images.length - 1)]} alt={item.name} />
@@ -179,7 +197,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
       <div className="menu-card-body">
         <div className="menu-card-header">
           <h3 className="menu-card-name">{item.name}</h3>
-          <span className="menu-card-price">${item.price.toFixed(2)}</span>
+          <span className="menu-card-price">{formatMWK(item.price)}</span>
         </div>
         {showProvider && item.providerName && (
           <Link
@@ -197,7 +215,14 @@ export default function MenuCard({ item, showProvider = false, providerControls 
             {showAllImages ? 'Hide photos' : `Expand ${images.length === 1 ? 'photo' : `${images.length} photos`}`}
           </button>
           {showAllImages && <div className="menu-card-expanded-gallery">
-            <img className="menu-card-expanded-photo" src={images[Math.min(activeImageIndex, images.length - 1)]} alt={`${item.name}, selected photo`} />
+            <div className="menu-card-gallery-stage">
+              <img className="menu-card-expanded-photo" src={images[Math.min(activeImageIndex, images.length - 1)]} alt={`${item.name}, photo ${activeImageIndex + 1}`} />
+              {images.length > 1 && <>
+                <button type="button" className="menu-card-gallery-previous" onClick={() => setActiveImageIndex((activeImageIndex + images.length - 1) % images.length)} aria-label="Previous photo">‹</button>
+                <span className="menu-card-gallery-count">{activeImageIndex + 1} / {images.length}</span>
+                <button type="button" className="menu-card-gallery-next" onClick={() => setActiveImageIndex((activeImageIndex + 1) % images.length)} aria-label="Next photo">›</button>
+              </>}
+            </div>
             {images.length > 1 && <div className="menu-card-image-gallery">
               {images.map((image, index) => <button type="button" key={`${item.id}-image-${index}`} onClick={() => setActiveImageIndex(index)} aria-label={`Show photo ${index + 1}`} aria-pressed={activeImageIndex === index}>
                 <img src={image} alt={`${item.name}, photo ${index + 1}`} />
@@ -234,7 +259,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
           </button>
         </div>}
       </div>
-    </div>
+    </article>
     {showCheckout && createPortal(
         <div className="checkout-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setShowCheckout(false)}>
           <form className="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby={`checkout-title-${item.id}`} onSubmit={showSignup ? handleSignupAndOrder : showSignin ? handleSigninAndOrder : handleOrder}>

@@ -63,6 +63,13 @@ const createApp = () => {
     });
   };
 
+  const isValidProfileImage = (image) => image === undefined || image === null || image === '' || (
+    typeof image === 'string' && image.length <= 160000 && (
+      /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image) ||
+      /^https:\/\//i.test(image)
+    )
+  );
+
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'provider-service' });
   });
@@ -99,7 +106,8 @@ const createApp = () => {
       return res.status(404).json({ success: false, error: 'Provider profile not found' });
     }
 
-    return res.json({ success: true, data: await menuRepository.listByProvider(ownedProvider.id) });
+    const items = await menuRepository.listByProvider(ownedProvider.id);
+    return res.json({ success: true, data: await addSchoolAvailability(items, [ownedProvider]) });
   });
 
   app.get('/api/menu/featured', async (req, res) => {
@@ -140,9 +148,12 @@ const createApp = () => {
       return res.status(403).json({ success: false, error: 'Only administrators and providers can register schools' });
     }
 
-    const { name, location, studentCount } = req.body || {};
+    const { name, location, studentCount, image } = req.body || {};
     if (!name || !location) {
       return res.status(400).json({ success: false, error: 'School name and location are required' });
+    }
+    if (!isValidProfileImage(image)) {
+      return res.status(400).json({ success: false, error: 'School image must be one valid image under 160 KB' });
     }
 
     const existingSchools = await schoolRepository.list();
@@ -155,6 +166,7 @@ const createApp = () => {
       name: name.trim(),
       location: location.trim(),
       studentCount: Number(studentCount) || 0,
+      image: image || null,
       providerCount: 0,
       registeredBy: req.user.userId
     };
@@ -183,18 +195,43 @@ const createApp = () => {
     return res.status(201).json({ success: true, data: registeredSchool, message: 'School registered successfully' });
   });
 
+  app.put('/api/schools/:schoolId', requireAuth(), async (req, res) => {
+    if (!['school', 'provider', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, error: 'Only administrators can update school details' });
+    }
+    const school = await schoolRepository.findById(req.params.schoolId);
+    if (!school) return res.status(404).json({ success: false, error: 'School not found' });
+    if (req.user.role !== 'admin' && school.registeredBy !== req.user.userId) {
+      return res.status(403).json({ success: false, error: 'School administrator does not own this school record' });
+    }
+
+    const { name, location, studentCount, image } = req.body || {};
+    if (!isValidProfileImage(image)) {
+      return res.status(400).json({ success: false, error: 'School image must be one valid image under 160 KB' });
+    }
+    const updatedSchool = {
+      ...school,
+      ...(typeof name === 'string' && name.trim() ? { name: name.trim() } : {}),
+      ...(typeof location === 'string' && location.trim() ? { location: location.trim() } : {}),
+      ...(studentCount !== undefined ? { studentCount: Number(studentCount) || 0 } : {}),
+      ...(image !== undefined ? { image: image || null } : {})
+    };
+    await schoolRepository.save(updatedSchool);
+    return res.json({ success: true, data: updatedSchool, message: 'School details updated' });
+  });
+
   app.get('/api/admin/providers', requireAuth('admin'), async (req, res) => {
     res.json({ success: true, data: await providerRepository.list() });
   });
 
   app.post('/api/providers', requireAuth('provider'), async (req, res) => {
-    const { name, ownerName, email, status, schoolIds = [] } = req.body || {};
+    const { name, ownerName, email, status, schoolIds = [], description = '', image = null } = req.body || {};
 
     if (await providerRepository.findByOwnerUserId(req.user.userId) || await providerRepository.findById(req.user.providerId)) {
       return res.status(409).json({ success: false, error: 'Provider account may register only one provider' });
     }
 
-    if (!name || !ownerName || !email || !Array.isArray(schoolIds)) {
+    if (!name || !ownerName || !email || !Array.isArray(schoolIds) || typeof description !== 'string' || !isValidProfileImage(image)) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
@@ -213,6 +250,8 @@ const createApp = () => {
       name,
       ownerName,
       email,
+      description: description.trim(),
+      image,
       status: status || 'active',
       ownerUserId: req.user.userId,
       schoolIds: [...new Set(schoolIds)]
@@ -226,6 +265,30 @@ const createApp = () => {
       data: newProvider,
       message: 'Provider registered successfully'
     });
+  });
+
+  app.put('/api/providers/:providerId/profile', requireAuth('provider'), async (req, res) => {
+    const provider = await providerRepository.findById(req.params.providerId);
+    const ownsProvider = provider && (
+      provider.ownerUserId === req.user.userId ||
+      (req.user.providerId === provider.id && (!provider.ownerUserId || provider.ownerUserId === req.user.userId))
+    );
+    if (!ownsProvider) {
+      return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
+    }
+
+    const { name, description, image } = req.body || {};
+    if ((name !== undefined && (typeof name !== 'string' || !name.trim())) || (description !== undefined && typeof description !== 'string') || !isValidProfileImage(image)) {
+      return res.status(400).json({ success: false, error: 'Provider details or image are invalid' });
+    }
+    const updatedProvider = {
+      ...provider,
+      ...(name !== undefined ? { name: name.trim() } : {}),
+      ...(description !== undefined ? { description: description.trim() } : {}),
+      ...(image !== undefined ? { image: image || null } : {})
+    };
+    await providerRepository.save(updatedProvider);
+    return res.json({ success: true, data: updatedProvider, message: 'Provider profile updated' });
   });
 
   app.put('/api/providers/:providerId/schools', requireAuth('provider'), async (req, res) => {

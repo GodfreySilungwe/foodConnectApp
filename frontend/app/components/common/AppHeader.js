@@ -24,7 +24,7 @@ export default function AppHeader() {
           {user?.role !== 'provider' && <Link href="/providers" className={linkClassName('/providers')}>Providers</Link>}
           {user?.role === 'provider' && <Link href="/providers/menu" className={linkClassName('/providers/menu')}>My menu</Link>}
           {user?.role === 'provider' && <Link href="/providers/schools" className={linkClassName('/providers/schools')}>School coverage</Link>}
-          {user?.role === 'provider' && <Link href="/orders" className={linkClassName('/orders')}>Orders</Link>}
+          {['provider', 'customer'].includes(user?.role) && <Link href="/orders" className={linkClassName('/orders')}>{user.role === 'provider' ? 'Orders' : 'My orders'}</Link>}
         </nav>
         <div className="header-actions">
           {user ? (

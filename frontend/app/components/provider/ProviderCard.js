@@ -32,6 +32,7 @@ export default function ProviderCard({ provider }) {
       </div>
       <div className="provider-card-body">
         <h3 className="provider-card-name">{provider.name}</h3>
+        {provider.description && <p className="provider-card-description">{provider.description}</p>}
         <p className="provider-card-owner">{provider.ownerName}</p>
         <div className="provider-card-meta">
           <span>⭐ {provider.rating || '4.5'}</span>

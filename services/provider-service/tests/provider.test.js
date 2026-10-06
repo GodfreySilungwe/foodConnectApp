@@ -59,6 +59,25 @@ describe('Provider service', () => {
     expect(unauthorizedResponse.statusCode).toBe(403);
   });
 
+  it('allows providers to update their profile description and card image', async () => {
+    const response = await request(app)
+      .put('/api/providers/p-001/profile')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ description: 'Fresh local meals every day', image: 'data:image/jpeg;base64,AA==' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.data).toMatchObject({
+      description: 'Fresh local meals every day',
+      image: 'data:image/jpeg;base64,AA=='
+    });
+
+    const unauthorizedResponse = await request(app)
+      .put('/api/providers/p-001/profile')
+      .set('Authorization', `Bearer ${newProviderToken}`)
+      .send({ image: null });
+    expect(unauthorizedResponse.statusCode).toBe(403);
+  });
+
   it('rejects coverage that references an unregistered school', async () => {
     const response = await request(app)
       .put('/api/providers/p-001/schools')
@@ -208,10 +227,23 @@ describe('Provider service', () => {
     const response = await request(app)
       .post('/api/schools')
       .set('Authorization', `Bearer ${schoolToken}`)
-      .send({ name: 'Northside Primary', location: 'North District', studentCount: 450 });
+      .send({ name: 'Northside Primary', location: 'North District', studentCount: 450, image: 'data:image/jpeg;base64,AA==' });
 
     expect(response.statusCode).toBe(201);
-    expect(response.body.data).toMatchObject({ name: 'Northside Primary', location: 'North District', studentCount: 450 });
+    expect(response.body.data).toMatchObject({ name: 'Northside Primary', location: 'North District', studentCount: 450, image: 'data:image/jpeg;base64,AA==' });
+
+    const updateResponse = await request(app)
+      .put(`/api/schools/${response.body.data.id}`)
+      .set('Authorization', `Bearer ${schoolToken}`)
+      .send({ image: 'data:image/png;base64,AA==' });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.body.data.image).toBe('data:image/png;base64,AA==');
+
+    const unauthorizedResponse = await request(app)
+      .put(`/api/schools/${response.body.data.id}`)
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ image: null });
+    expect(unauthorizedResponse.statusCode).toBe(403);
   });
 
   it('allows administrators to register schools', async () => {
