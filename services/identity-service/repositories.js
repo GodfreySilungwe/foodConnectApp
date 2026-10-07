@@ -2,7 +2,10 @@ const dynamo = require('./dynamo');
 
 class MemoryUserRepository {
   constructor(seed = []) {
-    this.users = [...seed];
+    this.users = [...seed.map((user) => ({
+      ...user,
+      email: typeof user.email === 'string' ? user.email.trim().toLowerCase() : user.email
+    }))];
   }
 
   async list() {
@@ -10,11 +13,18 @@ class MemoryUserRepository {
   }
 
   async findByEmail(email) {
-    return this.users.find((user) => user.email === email);
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    return this.users.find((user) => user.email === normalizedEmail);
   }
 
   async save(user) {
-    this.users.push(user);
+    const normalizedUser = {
+      ...user,
+      email: typeof user.email === 'string' ? user.email.trim().toLowerCase() : user.email
+    };
+    const existingIndex = this.users.findIndex((existing) => existing.id === normalizedUser.id);
+    if (existingIndex === -1) this.users.push(normalizedUser);
+    else this.users[existingIndex] = normalizedUser;
     return user;
   }
 }
@@ -48,12 +58,16 @@ class DynamoUserRepository {
   }
 
   async findByEmail(email) {
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     const users = await this.list();
-    return users.find((user) => user.email === email);
+    return users.find((user) => user.email === normalizedEmail);
   }
 
   async save(user) {
-    await dynamo.saveUser(user);
+    await dynamo.saveUser({
+      ...user,
+      email: typeof user.email === 'string' ? user.email.trim().toLowerCase() : user.email
+    });
     return user;
   }
 

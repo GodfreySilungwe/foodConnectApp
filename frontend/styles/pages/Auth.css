@@ -132,9 +132,20 @@
 .form-group input, .form-group select { min-height: 48px; border-radius: var(--radius-md); border-color: var(--color-gray-300); background: #fcfcfb; }
 .form-group input:focus, .form-group select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 4px rgba(217,101,59,.12); }
 .auth-footer { border-top: 1px solid var(--color-gray-200); padding-top: 1.5rem; }
+.form-success { color: var(--color-accent); font-weight: 600; text-align: center; }
 
 @media (max-width: 480px) {
-  .auth-page { padding: 1rem; }
-  .auth-page::before { position: static; display: block; margin: .5rem 0 1rem; }
-  .auth-card { padding: 1.5rem; }
+  .auth-page {
+    min-height: calc(100dvh - var(--header-height));
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    overflow-y: auto;
+    padding: 1rem 0.75rem 1.5rem;
+  }
+  .auth-page::before { display: none; }
+  .auth-container { width: 100%; max-width: 32rem; margin-inline: auto; }
+  .auth-card { width: 100%; margin-inline: auto; padding: 1.25rem; }
+  .auth-header { margin-bottom: 1.25rem; }
+  .auth-header h1 { font-size: 1.65rem; }
 }

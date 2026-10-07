@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { getCurrentCoordinates } from '@/utils/location';
 import 'leaflet/dist/leaflet.css';
 import '@/styles/components/LocationPicker.css';
 
 const defaultCenter = [-13.2543, 34.3015];
 
-export default function LocationPicker({ value, onChange, label = 'Choose a location' }) {
+export default function LocationPicker({ value, onChange, label = 'Choose a location', autoLocate = false }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -21,6 +22,18 @@ export default function LocationPicker({ value, onChange, label = 'Choose a loca
   useEffect(() => {
     valueRef.current = value;
   }, [value]);
+
+  useEffect(() => {
+    if (!autoLocate || coordinatesSelected) return;
+    let active = true;
+    getCurrentCoordinates().then((coordinates) => {
+      const currentValue = valueRef.current;
+      if (active && !(Number.isFinite(currentValue?.latitude) && Number.isFinite(currentValue?.longitude))) {
+        onChangeRef.current(coordinates);
+      }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [autoLocate, coordinatesSelected]);
 
   useEffect(() => {
     let disposed = false;
@@ -83,12 +96,7 @@ export default function LocationPicker({ value, onChange, label = 'Choose a loca
   }, [coordinatesSelected, value?.latitude, value?.longitude]);
 
   const useCurrentLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => onChange({ latitude: coords.latitude, longitude: coords.longitude }),
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    getCurrentCoordinates().then(onChange).catch(() => {});
   };
 
   return (

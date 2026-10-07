@@ -20,10 +20,12 @@ export default function AppHeader() {
         </Link>
         <nav className="header-nav" aria-label="Main navigation">
           {user?.role !== 'provider' && <Link href="/menu" className={linkClassName('/menu')}>Menu</Link>}
-          <Link href="/schools" className={linkClassName('/schools')}>Schools</Link>
+          <Link href="/schools" className={linkClassName('/schools')}>{user?.role === 'provider' ? 'All Schools' : 'Schools'}</Link>
           {user?.role !== 'provider' && <Link href="/providers" className={linkClassName('/providers')}>Providers</Link>}
           {user?.role === 'provider' && <Link href="/providers/menu" className={linkClassName('/providers/menu')}>My menu</Link>}
-          {user?.role === 'provider' && <Link href="/providers/schools" className={linkClassName('/providers/schools')}>School coverage</Link>}
+          {user?.role === 'provider' && <Link href="/providers/profile" className={linkClassName('/providers/profile')}>My Profile</Link>}
+          {user?.role === 'provider' && <Link href="/providers/schools" className={linkClassName('/providers/schools')}>My Schools</Link>}
+          {user?.role === 'superadmin' && <Link href="/admin" className={linkClassName('/admin')}>Admin</Link>}
           {['provider', 'customer'].includes(user?.role) && <Link href="/orders" className={linkClassName('/orders')}>{user.role === 'provider' ? 'Orders' : 'My orders'}</Link>}
         </nav>
         <div className="header-actions">

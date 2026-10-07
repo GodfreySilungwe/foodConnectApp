@@ -56,10 +56,34 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(user),
     }),
+  getAdminUsers: (token) => request(`${urls.identity}/api/admin/users`, {}, token),
+  updateAdminUserStatus: (userId, status, token) =>
+    request(`${urls.identity}/api/admin/users/${encodeURIComponent(userId)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }, token),
 
   // Providers
   getProviders: () => request(`${urls.provider}/api/providers`),
   getProvider: (id) => request(`${urls.provider}/api/providers/${id}`),
+  getAdminProviders: (token) => request(`${urls.provider}/api/admin/providers`, {}, token),
+  updateAdminProviderStatus: (id, status, token) =>
+    request(`${urls.provider}/api/admin/providers/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }, token),
+  getAdminSchools: (token) => request(`${urls.provider}/api/admin/schools`, {}, token),
+  updateAdminSchoolStatus: (id, status, token) =>
+    request(`${urls.provider}/api/admin/schools/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }, token),
+  submitProviderRating: (providerId, rating, token) =>
+    request(
+      `${urls.provider}/api/providers/${providerId}/ratings`,
+      { method: 'POST', body: JSON.stringify({ rating }) },
+      token
+    ),
   getMyMenu: (token) => request(`${urls.provider}/api/my/menu`, {}, token),
   updateProviderProfile: (providerId, profile, token) =>
     request(

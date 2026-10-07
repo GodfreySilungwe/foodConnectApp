@@ -1,12 +1,12 @@
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--spacing-6);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 0.85rem;
 }
 
 .menu-grid-empty {
   text-align: center;
-  padding: var(--spacing-12);
+  padding: 1.5rem;
   color: var(--color-gray-500);
   background: var(--color-gray-50);
   border-radius: var(--radius-lg);

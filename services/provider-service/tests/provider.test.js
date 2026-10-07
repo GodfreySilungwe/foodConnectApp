@@ -4,9 +4,11 @@ const app = require('../server');
 
 const providerToken = jwt.sign({ userId: 'u-002', role: 'provider' }, 'foodconnect-development-secret');
 const newProviderToken = jwt.sign({ userId: 'u-004', role: 'provider', providerId: 'p-004' }, 'foodconnect-development-secret');
+const unassociatedProviderToken = jwt.sign({ userId: 'u-005', role: 'provider', providerId: 'p-005' }, 'foodconnect-development-secret');
 const customerToken = jwt.sign({ userId: 'u-001', role: 'customer' }, 'foodconnect-development-secret');
 const schoolToken = jwt.sign({ userId: 'u-school', role: 'school' }, 'foodconnect-development-secret');
 const adminToken = jwt.sign({ userId: 'u-admin', role: 'admin' }, 'foodconnect-development-secret');
+const superAdminToken = jwt.sign({ userId: 'u-super-admin', role: 'superadmin' }, 'foodconnect-development-secret');
 
 describe('Provider service', () => {
   it('repairs an outdated provider count when a school is viewed', async () => {
@@ -24,6 +26,7 @@ describe('Provider service', () => {
         name: 'Green Bowl',
         ownerName: 'Jane Doe',
         email: 'green@example.com',
+        phone: '+265 991 123 456',
         status: 'active',
         schoolIds: ['s-001']
       });
@@ -31,6 +34,7 @@ describe('Provider service', () => {
     expect(response.statusCode).toBe(201);
     expect(response.body.success).toBe(true);
     expect(response.body.data.name).toBe('Green Bowl');
+    expect(response.body.data.phone).toBe('+265 991 123 456');
     expect(response.body.data.schoolIds).toEqual(['s-001']);
     const schoolResponse = await request(app).get('/api/schools/s-001');
     expect(schoolResponse.body.data.providerCount).toBe(2);
@@ -41,6 +45,24 @@ describe('Provider service', () => {
       .send({ name: 'Second Kitchen', ownerName: 'Jane Doe', email: 'second@example.com' });
 
     expect(duplicateResponse.statusCode).toBe(409);
+  });
+
+  it('allows a provider profile to be saved before school associations are selected', async () => {
+    const response = await request(app)
+      .post('/api/providers')
+      .set('Authorization', `Bearer ${unassociatedProviderToken}`)
+      .send({
+        name: 'Independent Kitchen',
+        ownerName: 'Alex Doe',
+        email: 'alex@example.com',
+        location: 'Central District',
+        latitude: -13.96,
+        longitude: 33.77,
+        schoolIds: []
+      });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.data.schoolIds).toEqual([]);
   });
 
   it('updates school coverage only for the owning provider', async () => {
@@ -97,12 +119,13 @@ describe('Provider service', () => {
     const response = await request(app)
       .put('/api/providers/p-001/profile')
       .set('Authorization', `Bearer ${providerToken}`)
-      .send({ description: 'Fresh local meals every day', image: 'data:image/jpeg;base64,AA==' });
+      .send({ description: 'Fresh local meals every day', image: 'data:image/jpeg;base64,AA==', phone: '+265 991 123 456' });
 
     expect(response.statusCode).toBe(200);
     expect(response.body.data).toMatchObject({
       description: 'Fresh local meals every day',
-      image: 'data:image/jpeg;base64,AA=='
+      image: 'data:image/jpeg;base64,AA==',
+      phone: '+265 991 123 456'
     });
 
     const unauthorizedResponse = await request(app)
@@ -203,6 +226,22 @@ describe('Provider service', () => {
     expect(restoreResponse.statusCode).toBe(200);
   });
 
+  it('allows parents to submit a provider rating and returns the average rating', async () => {
+    const firstRating = await request(app)
+      .post('/api/providers/p-001/ratings')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({ rating: 4 });
+
+    expect(firstRating.statusCode).toBe(201);
+    expect(firstRating.body.success).toBe(true);
+    expect(firstRating.body.data.averageRating).toBeGreaterThanOrEqual(4);
+
+    const providerResponse = await request(app).get('/api/providers/p-001');
+    expect(providerResponse.statusCode).toBe(200);
+    expect(providerResponse.body.data.rating).toBeGreaterThanOrEqual(4);
+    expect(providerResponse.body.data.ratingCount).toBeGreaterThanOrEqual(1);
+  });
+
   it('lists menu items for a provider', async () => {
     const response = await request(app).get('/api/providers/p-001/menu');
 
@@ -290,7 +329,7 @@ describe('Provider service', () => {
     expect(response.body.data).toMatchObject({ name: 'Admin Registered School', studentCount: 0 });
   });
 
-  it('allows providers to register a school with the default student count', async () => {
+  it('allows providers to register a school without automatically associating it', async () => {
     const response = await request(app)
       .post('/api/schools')
       .set('Authorization', `Bearer ${providerToken}`)
@@ -300,11 +339,11 @@ describe('Provider service', () => {
     expect(response.body.data).toMatchObject({
       name: 'Provider Registered School',
       studentCount: 0,
-      providerCount: 1,
+      providerCount: 0,
       registeredBy: 'u-002'
     });
     const providerResponse = await request(app).get('/api/providers/p-001');
-    expect(providerResponse.body.data.schoolIds).toContain(response.body.data.id);
+    expect(providerResponse.body.data.schoolIds).not.toContain(response.body.data.id);
   });
 
   it('shows all providers and associated counts to anyone viewing a school', async () => {
@@ -351,5 +390,46 @@ describe('Provider service', () => {
       .send({ name: 'Unauthorized Dish', price: 10 });
 
     expect(response.statusCode).toBe(403);
+  });
+
+  it('allows super-admins to suspend and restore providers and schools', async () => {
+    const forbiddenProviderUpdate = await request(app)
+      .patch('/api/admin/providers/p-001/status')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'suspended' });
+    expect(forbiddenProviderUpdate.statusCode).toBe(403);
+
+    const suspendedProvider = await request(app)
+      .patch('/api/admin/providers/p-001/status')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'suspended' });
+    expect(suspendedProvider.statusCode).toBe(200);
+    expect((await request(app).get('/api/providers/p-001')).statusCode).toBe(404);
+    const inactiveProviderAction = await request(app)
+      .post('/api/providers/p-001/menu')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ name: 'Blocked Dish', price: 10, images: [] });
+    expect(inactiveProviderAction.statusCode).toBe(403);
+
+    const restoredProvider = await request(app)
+      .patch('/api/admin/providers/p-001/status')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'active' });
+    expect(restoredProvider.body.data.status).toBe('active');
+    expect((await request(app).get('/api/providers/p-001')).statusCode).toBe(200);
+
+    const suspendedSchool = await request(app)
+      .patch('/api/admin/schools/s-001/status')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'deleted' });
+    expect(suspendedSchool.statusCode).toBe(200);
+    expect((await request(app).get('/api/schools/s-001')).statusCode).toBe(404);
+
+    const restoredSchool = await request(app)
+      .patch('/api/admin/schools/s-001/status')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({ status: 'active' });
+    expect(restoredSchool.body.data.status).toBe('active');
+    expect((await request(app).get('/api/schools/s-001')).statusCode).toBe(200);
   });
 });

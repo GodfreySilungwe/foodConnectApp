@@ -11,6 +11,23 @@ const createApp = () => {
       typeof longitude === 'number' && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
     );
   };
+  const getProviderRatingSummary = (provider) => {
+    const ratings = Array.isArray(provider?.ratings) ? provider.ratings : [];
+    const validRatings = ratings
+      .filter((entry) => entry && typeof entry === 'object' && Number.isFinite(entry.rating) && entry.rating >= 1 && entry.rating <= 5)
+      .map((entry) => Number(entry.rating));
+    const ratingCount = validRatings.length;
+    const averageRating = ratingCount
+      ? Number((validRatings.reduce((sum, value) => sum + value, 0) / ratingCount).toFixed(1))
+      : 0;
+    return {
+      rating: averageRating,
+      ratingCount,
+      averageRating
+    };
+  };
+  const withProviderRatingSummary = (provider) => provider ? { ...provider, ...getProviderRatingSummary(provider) } : provider;
+  const isActiveRecord = (record) => !record.status || record.status === 'active';
   const distanceKmBetween = (first, second) => {
     if (!Number.isFinite(first.latitude) || !Number.isFinite(first.longitude) || !Number.isFinite(second.latitude) || !Number.isFinite(second.longitude)) return null;
     const radians = (degrees) => degrees * Math.PI / 180;
@@ -23,7 +40,7 @@ const createApp = () => {
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_ORIGIN || 'http://localhost:3000');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
@@ -56,7 +73,7 @@ const createApp = () => {
       .filter((school) => affectedSchoolIds.has(school.id))
       .map((school) => schoolRepository.save({
         ...school,
-        providerCount: providers.filter((provider) => (provider.schoolIds || []).includes(school.id)).length
+        providerCount: providers.filter((provider) => isActiveRecord(provider) && (provider.schoolIds || []).includes(school.id)).length
       })));
   };
 
@@ -78,7 +95,7 @@ const createApp = () => {
       return {
         ...item,
         providerLocation,
-        availableSchools: schools.filter((school) => schoolIds.includes(school.id)).map((school) => {
+        availableSchools: schools.filter((school) => isActiveRecord(school) && schoolIds.includes(school.id)).map((school) => {
           const distanceKm = providerLocation ? distanceKmBetween(providerLocation, school) : null;
           return {
             id: school.id,
@@ -103,17 +120,45 @@ const createApp = () => {
   });
 
   app.get('/api/providers', async (req, res) => {
-    res.json({ success: true, data: await providerRepository.list() });
+    const providers = (await providerRepository.list()).filter(isActiveRecord);
+    res.json({ success: true, data: providers.map(withProviderRatingSummary) });
+  });
+
+  app.post('/api/providers/:providerId/ratings', requireAuth('customer'), async (req, res) => {
+    const provider = await providerRepository.findById(req.params.providerId);
+    if (!provider || !isActiveRecord(provider)) {
+      return res.status(404).json({ success: false, error: 'Provider not found' });
+    }
+
+    const rating = Number(req.body?.rating);
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, error: 'Rating must be a number from 1 to 5' });
+    }
+
+    const existingRatings = Array.isArray(provider.ratings) ? provider.ratings : [];
+    const nextRatings = [...existingRatings.filter((entry) => entry?.userId !== req.user.userId)];
+    nextRatings.push({ userId: req.user.userId, rating });
+
+    const updatedProvider = { ...provider, ratings: nextRatings };
+    await providerRepository.save(updatedProvider);
+
+    return res.status(201).json({
+      success: true,
+      data: withProviderRatingSummary(updatedProvider),
+      message: 'Provider rating submitted successfully'
+    });
   });
 
   app.get('/api/providers/:providerId', async (req, res) => {
     const provider = await providerRepository.findById(req.params.providerId);
-    if (!provider) return res.status(404).json({ success: false, error: 'Provider not found' });
+    if (!provider || !isActiveRecord(provider)) return res.status(404).json({ success: false, error: 'Provider not found' });
     const menu = await menuRepository.listByProvider(provider.id);
-    return res.json({ success: true, data: { ...provider, menuCount: menu.length } });
+    return res.json({ success: true, data: { ...withProviderRatingSummary(provider), menuCount: menu.length } });
   });
 
   app.get('/api/providers/:providerId/menu', async (req, res) => {
+    const provider = await providerRepository.findById(req.params.providerId);
+    if (!provider || !isActiveRecord(provider)) return res.status(404).json({ success: false, error: 'Provider not found' });
     const [items, providers] = await Promise.all([menuRepository.listByProvider(req.params.providerId), providerRepository.list()]);
     const availableItems = await addSchoolAvailability(items, providers);
     return res.json({ success: true, data: availableItems });
@@ -133,13 +178,14 @@ const createApp = () => {
     if (!ownedProvider) {
       return res.status(404).json({ success: false, error: 'Provider profile not found' });
     }
+    if (!isActiveRecord(ownedProvider)) return res.status(403).json({ success: false, error: 'Provider account is inactive' });
 
     const items = await menuRepository.listByProvider(ownedProvider.id);
     return res.json({ success: true, data: await addSchoolAvailability(items, [ownedProvider]) });
   });
 
   app.get('/api/menu/featured', async (req, res) => {
-    const providers = await providerRepository.list();
+    const providers = (await providerRepository.list()).filter(isActiveRecord);
     const providerNames = new Map(providers.map((provider) => [provider.id, provider.name]));
     const featuredItems = (await menuRepository.list()).filter((item) => item.available).map((item) => ({
       ...item,
@@ -150,29 +196,29 @@ const createApp = () => {
   });
 
   app.get('/api/schools', async (req, res) => {
-    res.json({ success: true, data: await refreshSchoolProviderCounts() });
+    res.json({ success: true, data: (await refreshSchoolProviderCounts()).filter(isActiveRecord) });
   });
 
   app.get('/api/schools/:schoolId', async (req, res) => {
     await updateSchoolProviderCounts([req.params.schoolId]);
     const school = await schoolRepository.findById(req.params.schoolId);
-    if (!school) return res.status(404).json({ success: false, error: 'School not found' });
+    if (!school || !isActiveRecord(school)) return res.status(404).json({ success: false, error: 'School not found' });
     return res.json({ success: true, data: school });
   });
 
   app.get('/api/schools/:schoolId/providers', async (req, res) => {
     await updateSchoolProviderCounts([req.params.schoolId]);
     const school = await schoolRepository.findById(req.params.schoolId);
-    if (!school) return res.status(404).json({ success: false, error: 'School not found' });
+    if (!school || !isActiveRecord(school)) return res.status(404).json({ success: false, error: 'School not found' });
 
     const providers = (await providerRepository.list())
-      .filter((provider) => (provider.schoolIds || []).includes(school.id))
+      .filter((provider) => isActiveRecord(provider) && (provider.schoolIds || []).includes(school.id))
       .map(({ id, name, ownerName, status, schoolIds }) => ({ id, name, ownerName, status, schoolIds }));
     return res.json({ success: true, data: providers });
   });
 
   app.post('/api/schools', requireAuth(), async (req, res) => {
-    if (!['school', 'provider', 'admin'].includes(req.user.role)) {
+    if (!['school', 'provider', 'admin', 'superadmin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, error: 'Only administrators and providers can register schools' });
     }
 
@@ -205,36 +251,17 @@ const createApp = () => {
     };
     await schoolRepository.save(newSchool);
 
-    if (req.user.role === 'provider') {
-      const ownedProvider = await providerRepository.findByOwnerUserId(req.user.userId);
-      const legacyProvider = !ownedProvider && req.user.providerId
-        ? await providerRepository.findById(req.user.providerId)
-        : null;
-      const provider = ownedProvider || (
-        legacyProvider && (!legacyProvider.ownerUserId || legacyProvider.ownerUserId === req.user.userId)
-          ? legacyProvider
-          : null
-      );
-      if (provider) {
-        await providerRepository.save({
-          ...provider,
-          schoolIds: [...new Set([...(provider.schoolIds || []), newSchool.id])]
-        });
-        await updateSchoolProviderCounts([newSchool.id]);
-      }
-    }
-
     const registeredSchool = await schoolRepository.findById(newSchool.id);
     return res.status(201).json({ success: true, data: registeredSchool, message: 'School registered successfully' });
   });
 
   app.put('/api/schools/:schoolId', requireAuth(), async (req, res) => {
-    if (!['school', 'provider', 'admin'].includes(req.user.role)) {
+    if (!['school', 'provider', 'admin', 'superadmin'].includes(req.user.role)) {
       return res.status(403).json({ success: false, error: 'Only administrators can update school details' });
     }
     const school = await schoolRepository.findById(req.params.schoolId);
     if (!school) return res.status(404).json({ success: false, error: 'School not found' });
-    if (req.user.role !== 'admin' && school.registeredBy !== req.user.userId) {
+    if (!['admin', 'superadmin'].includes(req.user.role) && school.registeredBy !== req.user.userId) {
       return res.status(403).json({ success: false, error: 'School administrator does not own this school record' });
     }
 
@@ -257,12 +284,41 @@ const createApp = () => {
     return res.json({ success: true, data: updatedSchool, message: 'School details updated' });
   });
 
-  app.get('/api/admin/providers', requireAuth('admin'), async (req, res) => {
-    res.json({ success: true, data: await providerRepository.list() });
+  app.get('/api/admin/providers', requireAuth(['admin', 'superadmin']), async (req, res) => {
+    res.json({ success: true, data: (await providerRepository.list()).map(withProviderRatingSummary) });
+  });
+
+  app.get('/api/admin/schools', requireAuth('superadmin'), async (req, res) => {
+    res.json({ success: true, data: await refreshSchoolProviderCounts() });
+  });
+
+  app.patch('/api/admin/providers/:providerId/status', requireAuth('superadmin'), async (req, res) => {
+    const { status } = req.body || {};
+    if (!['active', 'suspended', 'deleted'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be active, suspended, or deleted' });
+    }
+    const provider = await providerRepository.findById(req.params.providerId);
+    if (!provider) return res.status(404).json({ success: false, error: 'Provider not found' });
+    const updatedProvider = { ...provider, status };
+    await providerRepository.save(updatedProvider);
+    await updateSchoolProviderCounts(provider.schoolIds || []);
+    return res.json({ success: true, data: updatedProvider, message: 'Provider status updated' });
+  });
+
+  app.patch('/api/admin/schools/:schoolId/status', requireAuth('superadmin'), async (req, res) => {
+    const { status } = req.body || {};
+    if (!['active', 'suspended', 'deleted'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be active, suspended, or deleted' });
+    }
+    const school = await schoolRepository.findById(req.params.schoolId);
+    if (!school) return res.status(404).json({ success: false, error: 'School not found' });
+    const updatedSchool = { ...school, status };
+    await schoolRepository.save(updatedSchool);
+    return res.json({ success: true, data: updatedSchool, message: 'School status updated' });
   });
 
   app.post('/api/providers', requireAuth('provider'), async (req, res) => {
-    const { name, ownerName, email, status, schoolIds = [], description = '', image = null, location = '', latitude = null, longitude = null } = req.body || {};
+    const { name, ownerName, email, phone = '', status, schoolIds = [], description = '', image = null, location = '', latitude = null, longitude = null } = req.body || {};
 
     if (await providerRepository.findByOwnerUserId(req.user.userId) || await providerRepository.findById(req.user.providerId)) {
       return res.status(409).json({ success: false, error: 'Provider account may register only one provider' });
@@ -272,7 +328,7 @@ const createApp = () => {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
-        details: ['name, ownerName, email, and an array of schoolIds are required']
+        details: ['name, ownerName, email, location, valid coordinates, and an array of schoolIds are required']
       });
     }
 
@@ -287,6 +343,7 @@ const createApp = () => {
       name,
       ownerName,
       email,
+      phone: typeof phone === 'string' ? phone.trim() : '',
       description: description.trim(),
       image,
       location: location.trim(),
@@ -294,7 +351,8 @@ const createApp = () => {
       longitude,
       status: status || 'active',
       ownerUserId: req.user.userId,
-      schoolIds: [...new Set(schoolIds)]
+      schoolIds: [...new Set(schoolIds)],
+      ratings: []
     };
 
     await providerRepository.save(newProvider);
@@ -316,9 +374,10 @@ const createApp = () => {
     if (!ownsProvider) {
       return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
     }
+    if (!isActiveRecord(provider)) return res.status(403).json({ success: false, error: 'Provider account is inactive' });
 
-    const { name, description, image, location, latitude, longitude } = req.body || {};
-    if ((name !== undefined && (typeof name !== 'string' || !name.trim())) || (description !== undefined && typeof description !== 'string') || (location !== undefined && typeof location !== 'string') || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
+    const { name, description, image, location, phone, latitude, longitude } = req.body || {};
+    if ((name !== undefined && (typeof name !== 'string' || !name.trim())) || (description !== undefined && typeof description !== 'string') || (location !== undefined && typeof location !== 'string') || (phone !== undefined && typeof phone !== 'string') || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
       return res.status(400).json({ success: false, error: 'Provider details or image are invalid' });
     }
     const updatedProvider = {
@@ -327,6 +386,7 @@ const createApp = () => {
       ...(description !== undefined ? { description: description.trim() } : {}),
       ...(image !== undefined ? { image: image || null } : {}),
       ...(location !== undefined ? { location: location.trim() } : {}),
+      ...(phone !== undefined ? { phone: phone.trim() } : {}),
       ...(latitude !== undefined && longitude !== undefined ? { latitude, longitude } : {})
     };
     await providerRepository.save(updatedProvider);
@@ -345,6 +405,7 @@ const createApp = () => {
     if (!ownsProvider) {
       return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
     }
+    if (!isActiveRecord(provider)) return res.status(403).json({ success: false, error: 'Provider account is inactive' });
     if (!Array.isArray(schoolIds)) {
       return res.status(400).json({ success: false, error: 'schoolIds must be an array' });
     }
@@ -384,6 +445,8 @@ const createApp = () => {
     }
 
     const owner = await providerRepository.findByOwnerUserId(req.user.userId);
+    const provider = await providerRepository.findById(providerId);
+    if (!provider || !isActiveRecord(provider)) return res.status(403).json({ success: false, error: 'Provider account is inactive' });
     const ownsLegacyProvider = req.user.providerId === providerId;
     const ownsCurrentProvider = owner && owner.id === providerId && owner.ownerUserId === req.user.userId;
     if (!ownsCurrentProvider && !ownsLegacyProvider) {
@@ -434,6 +497,7 @@ const createApp = () => {
     if (!ownsProvider) {
       return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
     }
+    if (!isActiveRecord(provider)) return res.status(403).json({ success: false, error: 'Provider account is inactive' });
 
     const item = await menuRepository.findById(menuId);
     if (!item || item.providerId !== providerId) {
@@ -464,6 +528,7 @@ const createApp = () => {
     if (!ownsProvider) {
       return res.status(403).json({ success: false, error: 'Provider does not own this provider record' });
     }
+    if (!isActiveRecord(provider)) return res.status(403).json({ success: false, error: 'Provider account is inactive' });
     if (typeof available !== 'boolean') {
       return res.status(400).json({ success: false, error: 'available must be a boolean' });
     }

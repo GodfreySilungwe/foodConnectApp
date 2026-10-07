@@ -8,7 +8,9 @@ import MenuGrid from '@/components/menu/MenuGrid';
 import SchoolCard from '@/components/school/SchoolCard';
 import DashboardStats from '@/dashboard/DashboardStats';
 import AppHeader from '@/components/common/AppHeader';
+import SearchField from '@/components/common/SearchField';
 import { api } from '@/services/api';
+import { matchesSearch } from '@/utils/search';
 import '@/styles/pages/Home.css';
 
 export default function HomePage() {
@@ -16,6 +18,7 @@ export default function HomePage() {
   const [featuredProviders, setFeaturedProviders] = useState([]);
   const [featuredMenu, setFeaturedMenu] = useState([]);
   const [schools, setSchools] = useState([]);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalProviders: 0,
@@ -33,9 +36,9 @@ export default function HomePage() {
           api.getSchools(),
         ]);
 
-        setFeaturedProviders(providersRes.data?.slice(0, 4) || []);
-        setFeaturedMenu(menuRes.data?.slice(0, 6) || []);
-        setSchools(schoolsRes.data?.slice(0, 3) || []);
+        setFeaturedProviders(providersRes.data || []);
+        setFeaturedMenu(menuRes.data || []);
+        setSchools(schoolsRes.data || []);
 
         setStats({
           totalProviders: providersRes.data?.length || 0,
@@ -52,6 +55,26 @@ export default function HomePage() {
 
     loadData();
   }, []);
+
+  const filteredSchools = schools.filter((school) => matchesSearch(query, school.name, school.location));
+  const filteredMenu = featuredMenu.filter((item) => matchesSearch(
+    query,
+    item.name,
+    item.description,
+    item.providerName,
+    item.availableSchools?.map((school) => school.name).join(' ')
+  ));
+  const filteredProviders = featuredProviders.filter((provider) => matchesSearch(
+    query,
+    provider.name,
+    provider.ownerName,
+    provider.description,
+    provider.location,
+    schools.filter((school) => (provider.schoolIds || []).includes(school.id)).map((school) => school.name).join(' ')
+  ));
+  const visibleSchools = query ? filteredSchools : filteredSchools.slice(0, 3);
+  const visibleMenu = query ? filteredMenu : filteredMenu.slice(0, 6);
+  const visibleProviders = query ? filteredProviders : filteredProviders.slice(0, 4);
 
   if (loading) {
     return (
@@ -107,34 +130,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Dashboard Stats for Authenticated Users */}
-      {user && (
-        <section className="section">
-          <div className="container">
-            <DashboardStats stats={stats} />
-          </div>
-        </section>
-      )}
-
-      {/* Featured Providers */}
+      {/* Schools Section */}
       <section className="section section-alt">
         <div className="container">
           <div className="section-header">
             <div>
-              <h2>Top Providers</h2>
+              <h2>Registered Schools</h2>
               <p className="section-subtitle">
-                Discover the best food providers in your area
+                Schools offering food services
               </p>
             </div>
-            <Link href="/providers" className="btn btn-ghost">
-              View All →
-            </Link>
+            <Link href="/schools" className="btn btn-ghost">All Schools →</Link>
           </div>
-          <div className="provider-grid">
-            {featuredProviders.map((provider) => (
-              <ProviderCard key={provider.id} provider={provider} />
-            ))}
-          </div>
+          <SearchField value={query} onChange={setQuery} placeholder="Search schools, dishes, or providers" label="Search schools, dishes, and providers" />
+          {visibleSchools.length ? <div className="school-grid">
+            {visibleSchools.map((school) => <SchoolCard key={school.id} school={school} />)}
+          </div> : query && <p className="home-search-empty">No schools match your search.</p>}
         </div>
       </section>
 
@@ -152,31 +163,37 @@ export default function HomePage() {
               View Full Menu →
             </Link>
           </div>
-          <MenuGrid items={featuredMenu} showProvider />
+          {visibleMenu.length ? <MenuGrid items={visibleMenu} showProvider /> : query && <p className="home-search-empty">No dishes match your search.</p>}
         </div>
       </section>
 
-      {/* Schools Section */}
+      {/* Featured Providers */}
       <section className="section section-alt">
         <div className="container">
           <div className="section-header">
             <div>
-              <h2>Registered Schools</h2>
+              <h2>Top Providers</h2>
               <p className="section-subtitle">
-                Schools offering food services
+                Discover the best food providers in your area
               </p>
             </div>
-            <Link href="/schools" className="btn btn-ghost">
-              All Schools →
-            </Link>
+            <Link href="/providers" className="btn btn-ghost">View All →</Link>
           </div>
-          <div className="school-grid">
-            {schools.map((school) => (
-              <SchoolCard key={school.id} school={school} />
-            ))}
+          <div className="provider-grid">
+            {visibleProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}
           </div>
+          {query && !visibleProviders.length && <p className="home-search-empty">No providers match your search.</p>}
         </div>
       </section>
+
+      {/* Dashboard Stats for Authenticated Users */}
+      {user && (
+        <section className="section">
+          <div className="container">
+            <DashboardStats stats={stats} />
+          </div>
+        </section>
+      )}
 
       {/* CTA Section */}
       <section className="cta-section">

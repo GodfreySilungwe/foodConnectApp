@@ -97,6 +97,7 @@ services:
       NODE_ENV: development
       USE_DYNAMODB: "true"
       JWT_SECRET: foodconnect-development-secret
+      IDENTITY_SERVICE_URL: http://identity-service:3002
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
@@ -105,6 +106,8 @@ services:
       MENUS_TABLE: foodconnect-dev-menus
     depends_on:
       dynamodb-local:
+        condition: service_healthy
+      identity-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3003/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"" ]
@@ -126,6 +129,7 @@ services:
       NODE_ENV: development
       USE_DYNAMODB: "true"
       JWT_SECRET: foodconnect-development-secret
+      IDENTITY_SERVICE_URL: http://identity-service:3002
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
@@ -133,6 +137,8 @@ services:
       ORDERS_TABLE: foodconnect-dev-orders
     depends_on:
       dynamodb-local:
+        condition: service_healthy
+      identity-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3004/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"" ]

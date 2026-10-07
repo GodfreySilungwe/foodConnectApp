@@ -4,10 +4,26 @@ import { useState, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
+import LocationPicker from '@/components/common/LocationPicker';
 import { api } from '@/services/api';
+import { getCoordinatesOrCurrentPosition } from '@/utils/location';
 import { formatMWK } from '@/utils/formatCurrency';
 import Link from 'next/link';
 import '@/styles/components/MenuCard.css';
+
+const distanceKmBetween = (first, second) => {
+  if (!Number.isFinite(first?.latitude) || !Number.isFinite(first?.longitude) || !Number.isFinite(second?.latitude) || !Number.isFinite(second?.longitude)) {
+    return null;
+  }
+
+  const radians = (degrees) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(second.latitude - first.latitude);
+  const longitudeDelta = radians(second.longitude - first.longitude);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(radians(first.latitude)) * Math.cos(radians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
+
+  return Math.round(6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)) * 10) / 10;
+};
 
 export default function MenuCard({ item, showProvider = false, providerControls = false, onAvailabilityChange, onEditItem }) {
   const { user, token, register, login } = useContext(AuthContext);
@@ -19,7 +35,9 @@ export default function MenuCard({ item, showProvider = false, providerControls 
   const [showCheckout, setShowCheckout] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const [showSignin, setShowSignin] = useState(false);
-  const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '' });
+  const [signupError, setSignupError] = useState('');
+  const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '', phone: '', latitude: null, longitude: null });
+  const [estimatedDistanceKm, setEstimatedDistanceKm] = useState(null);
   const [signinForm, setSigninForm] = useState({ email: '', password: '' });
   const [schools, setSchools] = useState([]);
   const [studentName, setStudentName] = useState('');
@@ -47,8 +65,10 @@ export default function MenuCard({ item, showProvider = false, providerControls 
       return;
     }
 
-          <p className="menu-card-description">Available at: {item.availableSchools.length ? item.availableSchools.map((school) => `${school.name}${school.distanceKm !== null && school.distanceKm !== undefined ? ` · ${school.distanceKm} km · about ${school.estimatedMinutes} min` : ''}`).join(', ') : 'No registered schools'}</p>
     if (isLoadingSchools) return;
+    setShowSignup(false);
+    setShowSignin(false);
+    setShowCheckout(true);
     setIsLoadingSchools(true);
     setSchoolError('');
     try {
@@ -60,6 +80,15 @@ export default function MenuCard({ item, showProvider = false, providerControls 
       const availableSchools = (schoolResult.data || []).filter((school) => providerSchoolIds.includes(school.id));
       setSchools(availableSchools);
       setSchoolId(availableSchools[0]?.id || '');
+
+      const parentLocation = user && Number.isFinite(user.latitude) && Number.isFinite(user.longitude)
+        ? { latitude: user.latitude, longitude: user.longitude }
+        : null;
+      const providerLocation = Number.isFinite(providerResult.data?.latitude) && Number.isFinite(providerResult.data?.longitude)
+        ? { latitude: providerResult.data.latitude, longitude: providerResult.data.longitude }
+        : null;
+      setEstimatedDistanceKm(parentLocation && providerLocation ? distanceKmBetween(parentLocation, providerLocation) : null);
+
       if (!availableSchools.length) setSchoolError('This provider has no associated schools available for ordering yet.');
     } catch (error) {
       setSchoolError(error.message || 'Could not load registered schools');
@@ -113,8 +142,19 @@ export default function MenuCard({ item, showProvider = false, providerControls 
   const handleSignupAndOrder = async (event) => {
     event.preventDefault();
     setIsOrdering(true);
+
+    let coordinates;
     try {
-      const session = await register({ ...signupForm, role: 'customer' });
+      coordinates = await getCoordinatesOrCurrentPosition(signupForm);
+      setSignupForm((current) => ({ ...current, ...coordinates }));
+    } catch (error) {
+      showNotification(error.message, 'error');
+      setIsOrdering(false);
+      return;
+    }
+
+    try {
+      const session = await register({ ...signupForm, ...coordinates, role: 'customer' });
       setShowSignup(false);
       const school = schools.find((entry) => entry.id === schoolId);
       await api.createOrder({
@@ -133,11 +173,15 @@ export default function MenuCard({ item, showProvider = false, providerControls 
       setStudentName('');
       setStudentClass('');
       setFoodPreferences('');
-      setSignupForm({ name: '', email: '', password: '' });
+      setSignupForm({ name: '', email: '', password: '', phone: '', latitude: null, longitude: null });
       setShowSignup(false);
       setShowCheckout(false);
     } catch (error) {
-      showNotification(error.message || 'Could not create account or place order', 'error');
+      if (error.message?.toLowerCase().includes('already exists')) {
+        setSignupError('An account with this email already exists. Sign in to place your order.');
+      } else {
+        showNotification(error.message || 'Could not create account or place order', 'error');
+      }
     } finally {
       setIsOrdering(false);
     }
@@ -231,7 +275,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
           </div>}
         </>}
         {Array.isArray(item.availableSchools) && (
-          <p className="menu-card-description">Available at: {item.availableSchools.length ? item.availableSchools.map((school) => `${school.name}${school.distanceKm !== null && school.distanceKm !== undefined ? ` · ${school.distanceKm} km · approx. ${school.estimatedMinutes} min delivery` : ''}`).join(', ') : 'No registered schools'}</p>
+          <p className="menu-card-description">Available at: {item.availableSchools.length ? item.availableSchools.map((school, index) => <span key={school.id}>{index > 0 && ', '}<strong>{school.name}</strong>{school.distanceKm !== null && school.distanceKm !== undefined ? ` · ${school.distanceKm} km · approx. ${school.estimatedMinutes} min delivery` : ''}</span>) : 'No registered schools'}</p>
         )}
         {providerControls ? <div className="menu-card-provider-controls">
           <label className="menu-card-availability">
@@ -252,7 +296,10 @@ export default function MenuCard({ item, showProvider = false, providerControls 
           </div>
           <button
             className="btn btn-primary btn-sm"
-            onClick={openCheckout}
+            onClick={(event) => {
+              event.stopPropagation();
+              openCheckout();
+            }}
             disabled={isOrdering || item.available === false}
           >
             Order for student
@@ -272,10 +319,21 @@ export default function MenuCard({ item, showProvider = false, providerControls 
               <label className="checkout-field" htmlFor={`parent-email-${item.id}`}>Email address
                 <input id={`parent-email-${item.id}`} type="email" value={signupForm.email} onChange={(event) => setSignupForm({ ...signupForm, email: event.target.value })} required autoComplete="email" />
               </label>
+              <label className="checkout-field" htmlFor={`parent-phone-${item.id}`}>Phone number
+                <input id={`parent-phone-${item.id}`} type="tel" value={signupForm.phone} onChange={(event) => setSignupForm({ ...signupForm, phone: event.target.value })} required autoComplete="tel" />
+              </label>
               <label className="checkout-field" htmlFor={`parent-password-${item.id}`}>Password
                 <input id={`parent-password-${item.id}`} type="password" minLength={6} value={signupForm.password} onChange={(event) => setSignupForm({ ...signupForm, password: event.target.value })} required autoComplete="new-password" />
               </label>
-              <p className="checkout-hint">Already have an account? <button type="button" className="checkout-inline-action" onClick={() => { setShowSignup(false); setShowSignin(true); }}>Sign in</button></p>
+              <LocationPicker
+                value={{ latitude: signupForm.latitude, longitude: signupForm.longitude }}
+                onChange={(coordinates) => setSignupForm((current) => ({ ...current, ...coordinates }))}
+                label="Select your home or pickup location"
+                autoLocate
+              />
+              {estimatedDistanceKm !== null && <p className="checkout-hint">Estimated distance from your saved location to this provider: {estimatedDistanceKm.toFixed(1)} km</p>}
+              {signupError && <p className="checkout-error" role="alert">{signupError} <button type="button" className="checkout-inline-action" onClick={() => { setSigninForm((current) => ({ ...current, email: signupForm.email })); setSignupError(''); setShowSignup(false); setShowSignin(true); }}>Sign in</button></p>}
+              {!signupError && <p className="checkout-hint">Already have an account? <button type="button" className="checkout-inline-action" onClick={() => { setSigninForm((current) => ({ ...current, email: signupForm.email })); setShowSignup(false); setShowSignin(true); }}>Sign in</button></p>}
             </> : showSignin ? <>
               <label className="checkout-field" htmlFor={`signin-email-${item.id}`}>Email address
                 <input id={`signin-email-${item.id}`} type="email" value={signinForm.email} onChange={(event) => setSigninForm({ ...signinForm, email: event.target.value })} required autoComplete="email" autoFocus />
@@ -285,6 +343,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
               </label>
               <p className="checkout-hint">New to FoodConnect? <button type="button" className="checkout-inline-action" onClick={() => { setShowSignin(false); setShowSignup(true); }}>Create an account</button></p>
             </> : <>
+              {!user && <p className="checkout-hint">Already have an account? <button type="button" className="checkout-inline-action" onClick={() => { setShowSignin(true); setShowSignup(false); }}>Sign in</button></p>}
               <label className="checkout-field" htmlFor={`student-name-${item.id}`}>Student name
                 <input id={`student-name-${item.id}`} value={studentName} onChange={(event) => setStudentName(event.target.value)} required maxLength={100} autoFocus />
               </label>
@@ -299,6 +358,9 @@ export default function MenuCard({ item, showProvider = false, providerControls 
               <label className="checkout-field" htmlFor={`food-preferences-${item.id}`}>Food preferences or allergies
                 <textarea id={`food-preferences-${item.id}`} value={foodPreferences} onChange={(event) => setFoodPreferences(event.target.value)} placeholder="Allergies, ingredients to avoid, or preparation requests" maxLength={500} rows={3} />
               </label>
+              {user && Number.isFinite(user.latitude) && Number.isFinite(user.longitude) && estimatedDistanceKm !== null && (
+                <p className="checkout-hint">Estimated distance from your saved home location: {estimatedDistanceKm.toFixed(1)} km</p>
+              )}
             </>}
             {schoolError && <p className="checkout-error" role="alert">{schoolError}</p>}
             {!showSignup && !schoolError && !schools.length && <p className="checkout-hint">No schools are available yet. A school administrator or provider can register one from the <Link href="/schools">school directory</Link>.</p>}

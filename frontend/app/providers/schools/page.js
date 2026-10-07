@@ -7,28 +7,21 @@ import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 import AppHeader from '@/components/common/AppHeader';
 import SearchField from '@/components/common/SearchField';
-import { compressImage } from '@/utils/images';
 import { matchesSearch } from '@/utils/search';
-import LocationPicker from '@/components/common/LocationPicker';
 import '@/styles/pages/Auth.css';
 import '@/styles/pages/ProviderSchools.css';
-import '@/styles/components/ProfileImageUpload.css';
 
 export default function ProviderSchoolsPage() {
   const { user, token, loading: authLoading } = useContext(AuthContext);
   const { showNotification } = useContext(NotificationContext);
   const [schools, setSchools] = useState([]);
   const [selectedSchoolIds, setSelectedSchoolIds] = useState([]);
-  const [providerName, setProviderName] = useState('');
-  const [providerDescription, setProviderDescription] = useState('');
-  const [providerImage, setProviderImage] = useState('');
-  const [providerLocation, setProviderLocation] = useState('');
-  const [coordinates, setCoordinates] = useState({ latitude: null, longitude: null });
   const [schoolQuery, setSchoolQuery] = useState('');
   const [hasProviderProfile, setHasProviderProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -43,24 +36,18 @@ export default function ProviderSchoolsPage() {
         const schoolResult = await api.getSchools();
         if (!active) return;
         setSchools(schoolResult.data || []);
-        setProviderName(user.name || '');
-
         if (user.providerId) {
           try {
             const providerResult = await api.getProvider(user.providerId);
             if (!active) return;
             setHasProviderProfile(true);
-            setProviderName(providerResult.data.name || user.name || '');
-            setProviderDescription(providerResult.data.description || '');
-            setProviderImage(providerResult.data.image || '');
-            setProviderLocation(providerResult.data.location || '');
-            setCoordinates({
-              latitude: providerResult.data.latitude ?? null,
-              longitude: providerResult.data.longitude ?? null,
-            });
             setSelectedSchoolIds(providerResult.data.schoolIds || []);
           } catch (providerError) {
-            if (providerError.message !== 'Provider not found') throw providerError;
+            if (providerError.message === 'Provider not found') {
+              setHasProviderProfile(false);
+            } else {
+              throw providerError;
+            }
           }
         }
       } catch (requestError) {
@@ -80,56 +67,18 @@ export default function ProviderSchoolsPage() {
       : [...current, schoolId]);
   };
 
-  const selectProviderImage = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    try {
-      setProviderImage(await compressImage(file, 150000));
-    } catch (imageError) {
-      showNotification(imageError.message || 'Could not process provider image', 'error');
-    }
-  };
-
   const submit = async (event) => {
     event.preventDefault();
-    if (!providerLocation.trim() || !Number.isFinite(coordinates.latitude) || !Number.isFinite(coordinates.longitude)) {
-      showNotification('Enter a provider location and select its map pin.', 'warning');
+    if (!user?.providerId || !hasProviderProfile) {
+      showNotification('Save your provider profile before managing school coverage.', 'warning');
       return;
     }
-    if (!selectedSchoolIds.length) {
-      showNotification('Select at least one school you serve.', 'warning');
-      return;
-    }
-    if (!providerLocation.trim() || !Number.isFinite(coordinates.latitude) || !Number.isFinite(coordinates.longitude)) {
-      showNotification('Enter a provider location and select its map pin.', 'warning');
-      return;
-    }
+    setSaved(false);
     setSubmitting(true);
     try {
-      if (hasProviderProfile) {
-        await api.updateProviderProfile(user.providerId, {
-          name: providerName,
-          description: providerDescription,
-          image: providerImage || null,
-          location: providerLocation,
-          ...coordinates,
-        }, token);
-        await api.updateProviderSchools(user.providerId, selectedSchoolIds, token);
-      } else {
-        await api.registerProvider({
-          name: providerName,
-          ownerName: user.name,
-          email: user.email,
-          schoolIds: selectedSchoolIds,
-          description: providerDescription,
-          image: providerImage || null,
-          location: providerLocation,
-          ...coordinates,
-        }, token);
-        setHasProviderProfile(true);
-      }
+      await api.updateProviderSchools(user.providerId, selectedSchoolIds, token);
       showNotification('School coverage saved.', 'success');
+      setSaved(true);
     } catch (requestError) {
       showNotification(requestError.message || 'Could not save school coverage', 'error');
     } finally {
@@ -140,35 +89,32 @@ export default function ProviderSchoolsPage() {
   const filteredSchools = schools.filter((school) => matchesSearch(schoolQuery, school.name, school.location));
 
   return (
-    <><AppHeader /><main className="auth-page provider-schools-page">
-      <div className="auth-container">
-        <section className="auth-card provider-schools-card">
-          <header className="auth-header">
-            <span className="auth-icon" aria-hidden="true">⌖</span>
-            <h1>Schools you serve</h1>
-            <p className="auth-subtitle">Choose any registered schools to associate with your provider profile.</p>
-          </header>
+    <><AppHeader /><main className="container page-content provider-schools-page">
+        <header className="page-heading">
+          <p className="eyebrow">Provider workspace</p>
+          <h1>School coverage</h1>
+        </header>
           {authLoading || loading ? <p>Loading school coverage...</p> : !user ? (
-            <div className="auth-form">
+            <div>
               <p>Sign in with a provider account to set your school coverage.</p>
               <Link href="/register?role=provider" className="btn btn-primary btn-lg btn-block">Create provider account</Link>
               <Link href="/login" className="auth-link">Already have an account? Sign in</Link>
             </div>
           ) : user.role !== 'provider' ? (
-            <div className="auth-form"><p>Provider accounts are required to manage school coverage.</p></div>
+            <div><p>Provider accounts are required to manage school coverage.</p></div>
           ) : error ? (
             <p className="checkout-error" role="alert">{error}</p>
+          ) : !hasProviderProfile ? (
+            <section className="provider-coverage-empty">
+              <h2>Finish your provider profile first</h2>
+              <p>Your profile is saved separately. Once it is complete, you can choose schools here.</p>
+              <Link href="/providers/profile" className="btn btn-primary">Set up provider profile</Link>
+            </section>
           ) : (
             <form className="auth-form" onSubmit={submit}>
-              <div className="form-group"><label htmlFor="provider-name">Provider or kitchen name</label><input id="provider-name" value={providerName} onChange={(event) => setProviderName(event.target.value)} required maxLength={120} disabled={submitting} /></div>
-              <div className="form-group"><label htmlFor="provider-description">Short description or advert</label><textarea id="provider-description" value={providerDescription} onChange={(event) => setProviderDescription(event.target.value)} maxLength={240} rows={3} placeholder="Describe your kitchen or today's offer" disabled={submitting} /></div>
-              <div className="form-group"><label htmlFor="provider-location">Provider location</label><input id="provider-location" value={providerLocation} onChange={(event) => setProviderLocation(event.target.value)} required maxLength={160} placeholder="Town, district, or address" disabled={submitting} /></div>
-              <LocationPicker value={coordinates} onChange={setCoordinates} label="Select your provider location" />
-              <div className="form-group"><label htmlFor="provider-image">Provider card image</label><input id="provider-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectProviderImage} disabled={submitting} /><small>Choose one image; it will be cropped and compressed.</small></div>
-              {providerImage && <div className="profile-image-preview"><img src={providerImage} alt="Provider card preview" /><button type="button" onClick={() => setProviderImage('')} disabled={submitting}>Remove image</button></div>}
               <fieldset className="provider-school-options">
-                <legend>Schools you provide food to</legend>
-                <p><Link href="/schools/register">Register a new school</Link></p>
+                <legend>Schools served</legend>
+                <p><Link href="/schools/register?from=provider">Register a new school</Link></p>
                 {schools.length > 4 && <SearchField value={schoolQuery} onChange={setSchoolQuery} placeholder="Search schools by name or location" label="Search schools you serve" />}
                 {filteredSchools.length ? filteredSchools.map((school) => (
                   <label className="provider-school-option" key={school.id}>
@@ -177,11 +123,10 @@ export default function ProviderSchoolsPage() {
                   </label>
                 )) : <p>No schools match your search. <Link href="/schools/register">Register a school</Link>.</p>}
               </fieldset>
-              <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting || !schools.length}>{submitting ? 'Saving coverage...' : hasProviderProfile ? 'Save school coverage' : 'Register provider and schools'}</button>
+              <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={submitting}>{submitting ? 'Saving coverage...' : 'Save school coverage'}</button>
+              {saved && <p role="status" className="form-success">School coverage saved successfully.</p>}
             </form>
           )}
-        </section>
-      </div>
     </main></>
   );
 }

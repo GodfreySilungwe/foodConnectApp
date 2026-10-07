@@ -11,7 +11,8 @@ function requireAuth(requiredRole) {
 
     try {
       req.user = jwt.verify(token, secret);
-      if (requiredRole && req.user.role !== requiredRole) {
+      const requiredRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+      if (requiredRole && !requiredRoles.includes(req.user.role)) {
         return res.status(403).json({ success: false, error: 'Insufficient permissions' });
       }
       return next();

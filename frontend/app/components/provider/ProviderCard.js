@@ -10,6 +10,9 @@ export default function ProviderCard({ provider }) {
     inactive: 'status-inactive',
     suspended: 'status-suspended',
   };
+  const ratingValue = Number(provider?.rating ?? provider?.averageRating ?? 0) || 0;
+  const starCount = Math.min(5, Math.max(0, Math.round(ratingValue)));
+  const stars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
 
   return (
     <Link href={`/providers/${provider.id}`} className="provider-card">
@@ -35,7 +38,7 @@ export default function ProviderCard({ provider }) {
         {provider.description && <p className="provider-card-description">{provider.description}</p>}
         <p className="provider-card-owner">{provider.ownerName}</p>
         <div className="provider-card-meta">
-          <span>⭐ {provider.rating || '4.5'}</span>
+          <span>{stars} {ratingValue ? ratingValue.toFixed(1) : 'No ratings yet'}</span>
           <span>🕒 {provider.hours || '8:00 AM - 8:00 PM'}</span>
           <span>📍 {provider.location || 'Nearby'}</span>
         </div>

@@ -1,8 +1,8 @@
 .menu-card {
   background: rgba(255, 255, 255, 0.98);
-  border-radius: 1.2rem;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 16px 26px rgba(23, 42, 54, 0.06);
+  box-shadow: 0 5px 14px rgba(23, 42, 54, 0.05);
   border: 1px solid rgba(23, 42, 54, 0.06);
   transition: all var(--transition-base);
   display: flex;
@@ -11,7 +11,7 @@
 
 .menu-card:hover {
   box-shadow: 0 26px 38px rgba(23, 42, 54, 0.09);
-  transform: translateY(-5px);
+  transform: translateY(-2px);
 }
 
 .menu-card-has-images {
@@ -25,7 +25,7 @@
 
 .menu-card-image {
   position: relative;
-  height: 150px;
+  height: 132px;
   background: linear-gradient(135deg, #fff4eb, #f5f5f5);
   overflow: hidden;
 }
@@ -62,7 +62,7 @@
 }
 
 .menu-card-body {
-  padding: 0.88rem 0.9rem 0.96rem;
+  padding: 0.72rem;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -211,7 +211,12 @@
 
 .checkout-dialog {
   width: min(100%, 440px);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: grid;
+  align-content: start;
   gap: 1rem;
   padding: 1.5rem;
   border: 1px solid var(--color-gray-200);
