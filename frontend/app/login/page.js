@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import AppHeader from '@/components/common/AppHeader';
+import FormBackLink from '@/components/common/FormBackLink';
 import '@/styles/pages/Auth.css';
 
 export default function LoginPage() {
@@ -34,6 +35,7 @@ export default function LoginPage() {
     <><AppHeader /><div className="auth-page">
       <div className="auth-container">
         <div className="auth-card">
+          <FormBackLink />
           <div className="auth-header">
             <span className="auth-icon">🍽️</span>
             <h1>Welcome Back</h1>

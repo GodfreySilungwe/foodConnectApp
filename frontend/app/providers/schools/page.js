@@ -6,6 +6,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 import AppHeader from '@/components/common/AppHeader';
+import FormBackLink from '@/components/common/FormBackLink';
 import SearchField from '@/components/common/SearchField';
 import { matchesSearch } from '@/utils/search';
 import '@/styles/pages/Auth.css';
@@ -90,6 +91,7 @@ export default function ProviderSchoolsPage() {
 
   return (
     <><AppHeader /><main className="container page-content provider-schools-page">
+      <FormBackLink href="/providers/profile" label="Provider profile" />
         <header className="page-heading">
           <p className="eyebrow">Provider workspace</p>
           <h1>School coverage</h1>

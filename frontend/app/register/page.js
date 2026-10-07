@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import AppHeader from '@/components/common/AppHeader';
+import FormBackLink from '@/components/common/FormBackLink';
 import LocationPicker from '@/components/common/LocationPicker';
 import { getCoordinatesOrCurrentPosition } from '@/utils/location';
 import '@/styles/pages/Auth.css';
@@ -48,6 +49,7 @@ export default function RegisterPage() {
     <><AppHeader /><main className="auth-page">
       <div className="auth-container">
         <div className="auth-card">
+          <FormBackLink />
           <header className="auth-header">
             <span className="auth-icon">✦</span>
             <h1>Create your account</h1>

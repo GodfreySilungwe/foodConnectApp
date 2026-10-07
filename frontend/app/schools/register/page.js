@@ -7,6 +7,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 import AppHeader from '@/components/common/AppHeader';
+import FormBackLink from '@/components/common/FormBackLink';
 import { compressImage } from '@/utils/images';
 import { getCoordinatesOrCurrentPosition } from '@/utils/location';
 import LocationPicker from '@/components/common/LocationPicker';
@@ -59,6 +60,7 @@ export default function RegisterSchoolPage() {
     <><AppHeader /><main className="auth-page">
       <div className="auth-container">
         <div className="auth-card">
+          <FormBackLink href="/schools" label="Schools" />
           <header className="auth-header">
             <span className="auth-icon" aria-hidden="true">⌂</span>
             <h1>Register a school</h1>

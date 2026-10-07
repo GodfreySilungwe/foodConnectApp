@@ -133,6 +133,7 @@ export default function HomePage() {
       {/* Schools Section */}
       <section className="section section-alt">
         <div className="container">
+          <SearchField value={query} onChange={setQuery} placeholder="Search schools, dishes, or providers" label="Search schools, dishes, and providers" />
           <div className="section-header">
             <div>
               <h2>Registered Schools</h2>
@@ -142,7 +143,6 @@ export default function HomePage() {
             </div>
             <Link href="/schools" className="btn btn-ghost">All Schools →</Link>
           </div>
-          <SearchField value={query} onChange={setQuery} placeholder="Search schools, dishes, or providers" label="Search schools, dishes, and providers" />
           {visibleSchools.length ? <div className="school-grid">
             {visibleSchools.map((school) => <SchoolCard key={school.id} school={school} />)}
           </div> : query && <p className="home-search-empty">No schools match your search.</p>}

@@ -366,7 +366,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
             {!showSignup && !schoolError && !schools.length && <p className="checkout-hint">No schools are available yet. A school administrator or provider can register one from the <Link href="/schools">school directory</Link>.</p>}
             <div className="checkout-actions">
               <button type="button" className="btn btn-sm" onClick={() => { setShowCheckout(false); setShowSignup(false); setShowSignin(false); }}>Cancel</button>
-              {(showSignup || showSignin) && <button type="button" className="btn btn-sm" onClick={() => { setShowSignup(false); setShowSignin(false); }} disabled={isOrdering}>Back to order</button>}
+              {(showSignup || showSignin) && <button type="button" className="btn btn-sm" onClick={() => { setShowSignup(false); setShowSignin(false); }} disabled={isOrdering}><span aria-hidden="true">← </span>Back to order</button>}
               <button type="submit" className="btn btn-primary btn-sm" disabled={isOrdering || (!showSignup && !showSignin && (isLoadingSchools || !schools.length))}>{isOrdering ? 'Submitting...' : showSignup ? 'Create account and place order' : showSignin ? 'Sign in and place order' : user ? 'Place order' : 'Continue to sign up'}</button>
             </div>
           </form>

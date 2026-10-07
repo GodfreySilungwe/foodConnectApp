@@ -149,11 +149,27 @@ input, select {
 
 .page-back {
   display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin-bottom: 1rem;
   color: var(--color-gray-600);
   font-size: var(--text-sm);
   font-weight: 700;
 }
+
+.form-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  color: var(--color-gray-600);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.page-back::before { content: '←'; }
+.form-back-link span { font-size: 1.1rem; line-height: 1; }
+.page-back:hover, .form-back-link:hover { color: var(--color-primary-dark); }
 
 .page-heading {
   margin-bottom: 1.5rem;

@@ -6,6 +6,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 import AppHeader from '@/components/common/AppHeader';
+import FormBackLink from '@/components/common/FormBackLink';
 import LocationPicker from '@/components/common/LocationPicker';
 import { compressImage } from '@/utils/images';
 import { getCoordinatesOrCurrentPosition } from '@/utils/location';
@@ -120,6 +121,7 @@ export default function ProviderProfilePage() {
     <><AppHeader /><main className="auth-page">
       <div className="auth-container">
         <section className="auth-card">
+          <FormBackLink href="/providers" label="Providers" />
           <header className="auth-header">
             <span className="auth-icon" aria-hidden="true">⌂</span>
             <h1>{hasProviderProfile ? 'Provider profile' : 'Complete your provider profile'}</h1>

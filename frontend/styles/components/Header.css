@@ -219,6 +219,7 @@
 @media (max-width: 768px) {
   .header { height: auto; min-height: var(--header-height); }
   .header-inner { flex-wrap: wrap; padding-top: 0.4rem; padding-bottom: 0.4rem; }
+  .header-mobile-toggle { display: none; }
   .header-nav { display: flex; order: 3; width: 100%; overflow-x: auto; justify-content: flex-start; }
   .header-nav-link { padding: 0.45rem 0.62rem; font-size: 0.8rem; }
   .header-actions { gap: 0.45rem; }
@@ -240,17 +241,17 @@
     gap: 0.3rem;
     min-height: 34px;
     padding: 0.3rem 0.45rem;
-    border: 1px solid var(--color-gray-200);
-    background: transparent;
-    box-shadow: none;
-    color: var(--color-secondary);
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, var(--color-primary) 0%, #ec8c52 100%);
+    box-shadow: 0 12px 20px rgba(217, 101, 59, 0.18);
+    color: var(--color-white);
     font-size: 0.75rem;
     white-space: nowrap;
   }
-  .header-mobile-toggle:hover { transform: none; background: var(--color-gray-100); box-shadow: none; }
+  .header-mobile-toggle:hover { transform: none; background: linear-gradient(135deg, var(--color-primary-dark) 0%, #dd7742 100%); box-shadow: 0 12px 20px rgba(217, 101, 59, 0.18); }
   .header-logo { grid-column: 2; grid-row: 1; justify-self: start; }
   .header-logo-icon { display: none; }
-  .header-logo span:last-child { display: inline; font-size: 0.82rem; }
+  .header-logo span:last-child { display: none; }
   .header-nav {
     display: none;
     position: absolute;
