@@ -27,6 +27,9 @@ export default function ProviderOrdersPage() {
   const [updatingOrderId, setUpdatingOrderId] = useState('');
   const [menuItems, setMenuItems] = useState([]);
   const [query, setQuery] = useState('');
+  const [rangeStartInput, setRangeStartInput] = useState('');
+  const [rangeEndInput, setRangeEndInput] = useState('');
+  const [activeRange, setActiveRange] = useState({});
 
   useEffect(() => {
     if (authLoading) return;
@@ -37,8 +40,8 @@ export default function ProviderOrdersPage() {
 
     let active = true;
     const requests = user.role === 'provider'
-      ? Promise.all([api.getOrders(token), api.getMyMenu(token)])
-      : api.getOrders(token).then((ordersResult) => [ordersResult, { data: [] }]);
+      ? Promise.all([api.getOrders(token, activeRange), api.getMyMenu(token)])
+      : api.getOrders(token, activeRange).then((ordersResult) => [ordersResult, { data: [] }]);
     requests.then(([ordersResult, menuResult]) => {
         if (!active) return;
         setOrders(ordersResult.data || []);
@@ -51,7 +54,32 @@ export default function ProviderOrdersPage() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [authLoading, user, token]);
+  }, [activeRange, authLoading, user, token]);
+
+  const applyDateRange = (event) => {
+    event.preventDefault();
+    if (!rangeStartInput || !rangeEndInput) {
+      setError('Choose both a start and end date/time.');
+      return;
+    }
+    const from = new Date(rangeStartInput);
+    const to = new Date(rangeEndInput);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+      setError('The end date/time must be after the start date/time.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    setActiveRange({ from: from.toISOString(), to: to.toISOString() });
+  };
+
+  const clearDateRange = () => {
+    setRangeStartInput('');
+    setRangeEndInput('');
+    setError('');
+    setLoading(true);
+    setActiveRange({});
+  };
 
   const updateStatus = async (orderId, status) => {
     setUpdatingOrderId(orderId);
@@ -126,6 +154,12 @@ export default function ProviderOrdersPage() {
         )
       ) : error ? <p role="alert">{error}</p> : (
         <>
+        <form className="orders-date-filter" onSubmit={applyDateRange}>
+          <label>From <input type="datetime-local" value={rangeStartInput} onChange={(event) => setRangeStartInput(event.target.value)} required /></label>
+          <label>To <input type="datetime-local" value={rangeEndInput} onChange={(event) => setRangeEndInput(event.target.value)} required /></label>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={loading}>Filter orders</button>
+          {Object.keys(activeRange).length > 0 && <button type="button" className="btn btn-sm" onClick={clearDateRange} disabled={loading}>Clear dates</button>}
+        </form>
         <SearchField value={query} onChange={setQuery} placeholder="Search orders, schools, or status" label="Search orders" />
         <section className="provider-order-metrics" aria-label="Order performance">
           <article><span>Gross sales</span><strong>{formatMWK(grossSales)}</strong></article>

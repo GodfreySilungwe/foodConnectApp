@@ -1,6 +1,8 @@
 const express = require('express');
+const { randomUUID } = require('node:crypto');
 const { createRepository } = require('./repositories');
 const { requireAuth } = require('./auth');
+const malawiDistricts = require('./malawi-districts');
 
 const createApp = () => {
   const app = express();
@@ -46,45 +48,45 @@ const createApp = () => {
   });
   app.use(express.json({ limit: '320kb' }));
 
-  const providerRepository = createRepository(process.env.PROVIDERS_TABLE || 'foodconnect-dev-providers', [
+  const providerRepository = createRepository(process.env.PROVIDERS_TABLE || 'foodconnect-dev-providers-v2', [
     {
       id: 'p-001',
       name: 'Sunrise Kitchen',
       ownerName: 'Alice',
       email: 'sunrise@example.com',
+      district: 'Lilongwe',
       status: 'active',
       ownerUserId: 'u-002',
       schoolIds: ['s-001']
     }
   ]);
 
-  const menuRepository = createRepository(process.env.MENUS_TABLE || 'foodconnect-dev-menus', [
+  const menuRepository = createRepository(process.env.MENUS_TABLE || 'foodconnect-dev-menus-v2', [
     { id: 'm-101', providerId: 'p-001', name: 'Chicken Rice', price: 22.5, available: true }
   ]);
 
-  const schoolRepository = createRepository(process.env.SCHOOLS_TABLE || 'foodconnect-dev-schools', [
-    { id: 's-001', name: 'FoodConnect Central Campus', location: 'Singapore', studentCount: 1200, providerCount: 0 }
+  const schoolRepository = createRepository(process.env.SCHOOLS_TABLE || 'foodconnect-dev-schools-v2', [
+    { id: 's-001', name: 'FoodConnect Central Campus', location: 'Lilongwe', district: 'Lilongwe', studentCount: 1200, providerCount: 1 }
   ]);
 
   const updateSchoolProviderCounts = async (schoolIds) => {
-    const affectedSchoolIds = new Set(schoolIds);
-    const [schools, providers] = await Promise.all([schoolRepository.list(), providerRepository.list()]);
-    await Promise.all(schools
-      .filter((school) => affectedSchoolIds.has(school.id))
-      .map((school) => schoolRepository.save({
+    await Promise.all([...new Set(schoolIds)].map(async (schoolId) => {
+      const [school, providers] = await Promise.all([
+        schoolRepository.findById(schoolId),
+        providerRepository.listBySchool(schoolId),
+      ]);
+      if (!school) return;
+      await schoolRepository.save({
         ...school,
-        providerCount: providers.filter((provider) => isActiveRecord(provider) && (provider.schoolIds || []).includes(school.id)).length
-      })));
-  };
-
-  const refreshSchoolProviderCounts = async () => {
-    const schools = await schoolRepository.list();
-    await updateSchoolProviderCounts(schools.map((school) => school.id));
-    return schoolRepository.list();
+        providerCount: providers.filter(isActiveRecord).length,
+      });
+    }));
   };
 
   const addSchoolAvailability = async (items, providers) => {
-    const schools = await schoolRepository.list();
+    const schoolIds = [...new Set(providers.flatMap((provider) => provider.schoolIds || []))];
+    const schools = (await Promise.all(schoolIds.map((schoolId) => schoolRepository.findById(schoolId))))
+      .filter((school) => school && isActiveRecord(school));
     const providerById = new Map(providers.map((provider) => [provider.id, provider]));
     return items.map((item) => {
       const provider = providerById.get(item.providerId);
@@ -120,7 +122,13 @@ const createApp = () => {
   });
 
   app.get('/api/providers', async (req, res) => {
-    const providers = (await providerRepository.list()).filter(isActiveRecord);
+    if (req.query.district !== undefined && !malawiDistricts.has(req.query.district)) {
+      return res.status(400).json({ success: false, error: 'Choose a valid Malawi district' });
+    }
+    const records = req.query.district
+      ? await providerRepository.listByDistrict(req.query.district)
+      : await providerRepository.list();
+    const providers = records.filter(isActiveRecord);
     res.json({ success: true, data: providers.map(withProviderRatingSummary) });
   });
 
@@ -196,24 +204,30 @@ const createApp = () => {
   });
 
   app.get('/api/schools', async (req, res) => {
-    res.json({ success: true, data: (await refreshSchoolProviderCounts()).filter(isActiveRecord) });
+    if (req.query.district !== undefined && !malawiDistricts.has(req.query.district)) {
+      return res.status(400).json({ success: false, error: 'Choose a valid Malawi district' });
+    }
+    if (req.query.district) {
+      const schools = await schoolRepository.listByDistrict(req.query.district);
+      return res.json({ success: true, data: schools.filter(isActiveRecord) });
+    }
+    return res.json({ success: true, data: (await schoolRepository.list()).filter(isActiveRecord) });
   });
 
   app.get('/api/schools/:schoolId', async (req, res) => {
-    await updateSchoolProviderCounts([req.params.schoolId]);
     const school = await schoolRepository.findById(req.params.schoolId);
     if (!school || !isActiveRecord(school)) return res.status(404).json({ success: false, error: 'School not found' });
     return res.json({ success: true, data: school });
   });
 
   app.get('/api/schools/:schoolId/providers', async (req, res) => {
-    await updateSchoolProviderCounts([req.params.schoolId]);
     const school = await schoolRepository.findById(req.params.schoolId);
     if (!school || !isActiveRecord(school)) return res.status(404).json({ success: false, error: 'School not found' });
 
-    const providers = (await providerRepository.list())
-      .filter((provider) => isActiveRecord(provider) && (provider.schoolIds || []).includes(school.id))
-      .map(({ id, name, ownerName, status, schoolIds }) => ({ id, name, ownerName, status, schoolIds }));
+    const providerLinks = await providerRepository.listBySchool(school.id);
+    const providers = (await Promise.all(providerLinks.map((link) => providerRepository.findById(link.providerId || link.id))))
+      .filter((provider) => provider && isActiveRecord(provider))
+      .map(({ id, name, ownerName, status, schoolIds, district }) => ({ id, name, ownerName, status, schoolIds, district }));
     return res.json({ success: true, data: providers });
   });
 
@@ -222,9 +236,9 @@ const createApp = () => {
       return res.status(403).json({ success: false, error: 'Only administrators and providers can register schools' });
     }
 
-    const { name, location, studentCount, image, latitude, longitude } = req.body || {};
-    if (!name || !location) {
-      return res.status(400).json({ success: false, error: 'School name and location are required' });
+    const { name, location, district, studentCount, image, latitude, longitude } = req.body || {};
+    if (!name || !location || !malawiDistricts.has(district)) {
+      return res.status(400).json({ success: false, error: 'School name, location, and a valid Malawi district are required' });
     }
     if (!validCoordinates(latitude, longitude)) {
       return res.status(400).json({ success: false, error: 'A valid latitude and longitude pair is required' });
@@ -233,15 +247,16 @@ const createApp = () => {
       return res.status(400).json({ success: false, error: 'School image must be one valid image under 160 KB' });
     }
 
-    const existingSchools = await schoolRepository.list();
-    if (existingSchools.some((school) => school.name.toLowerCase() === name.trim().toLowerCase())) {
+    const existingSchools = await schoolRepository.findByName(name);
+    if (existingSchools.some((school) => isActiveRecord(school))) {
       return res.status(409).json({ success: false, error: 'A school with this name is already registered' });
     }
 
     const newSchool = {
-      id: `s-${Date.now()}`,
+      id: `s-${randomUUID()}`,
       name: name.trim(),
       location: location.trim(),
+      district,
       studentCount: Number(studentCount) || 0,
       image: image || null,
       latitude: latitude ?? null,
@@ -265,7 +280,10 @@ const createApp = () => {
       return res.status(403).json({ success: false, error: 'School administrator does not own this school record' });
     }
 
-    const { name, location, studentCount, image, latitude, longitude } = req.body || {};
+    const { name, location, district, studentCount, image, latitude, longitude } = req.body || {};
+    if (district !== undefined && !malawiDistricts.has(district)) {
+      return res.status(400).json({ success: false, error: 'Choose a valid Malawi district' });
+    }
     if (!isValidProfileImage(image)) {
       return res.status(400).json({ success: false, error: 'School image must be one valid image under 160 KB' });
     }
@@ -276,6 +294,7 @@ const createApp = () => {
       ...school,
       ...(typeof name === 'string' && name.trim() ? { name: name.trim() } : {}),
       ...(typeof location === 'string' && location.trim() ? { location: location.trim() } : {}),
+      ...(district !== undefined ? { district } : {}),
       ...(studentCount !== undefined ? { studentCount: Number(studentCount) || 0 } : {}),
       ...(image !== undefined ? { image: image || null } : {}),
       ...(latitude !== undefined && longitude !== undefined ? { latitude, longitude } : {})
@@ -285,11 +304,17 @@ const createApp = () => {
   });
 
   app.get('/api/admin/providers', requireAuth(['admin', 'superadmin']), async (req, res) => {
-    res.json({ success: true, data: (await providerRepository.list()).map(withProviderRatingSummary) });
+    if (!(malawiDistricts.has(req.query.district) || req.query.district === 'UNKNOWN')) {
+      return res.status(400).json({ success: false, error: 'A valid district is required' });
+    }
+    res.json({ success: true, data: (await providerRepository.listByDistrict(req.query.district)).map(withProviderRatingSummary) });
   });
 
   app.get('/api/admin/schools', requireAuth('superadmin'), async (req, res) => {
-    res.json({ success: true, data: await refreshSchoolProviderCounts() });
+    if (!(malawiDistricts.has(req.query.district) || req.query.district === 'UNKNOWN')) {
+      return res.status(400).json({ success: false, error: 'A valid district is required' });
+    }
+    res.json({ success: true, data: await schoolRepository.listByDistrict(req.query.district) });
   });
 
   app.patch('/api/admin/providers/:providerId/status', requireAuth('superadmin'), async (req, res) => {
@@ -318,17 +343,17 @@ const createApp = () => {
   });
 
   app.post('/api/providers', requireAuth('provider'), async (req, res) => {
-    const { name, ownerName, email, phone = '', status, schoolIds = [], description = '', image = null, location = '', latitude = null, longitude = null } = req.body || {};
+    const { name, ownerName, email, phone = '', district, status, schoolIds = [], description = '', image = null, location = '', latitude = null, longitude = null } = req.body || {};
 
     if (await providerRepository.findByOwnerUserId(req.user.userId) || await providerRepository.findById(req.user.providerId)) {
       return res.status(409).json({ success: false, error: 'Provider account may register only one provider' });
     }
 
-    if (!name || !ownerName || !email || !Array.isArray(schoolIds) || typeof description !== 'string' || typeof location !== 'string' || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
+    if (!name || !ownerName || !email || !malawiDistricts.has(district) || !Array.isArray(schoolIds) || typeof description !== 'string' || typeof location !== 'string' || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
-        details: ['name, ownerName, email, location, valid coordinates, and an array of schoolIds are required']
+        details: ['name, ownerName, email, district, location, valid coordinates, and an array of schoolIds are required']
       });
     }
 
@@ -339,11 +364,12 @@ const createApp = () => {
     }
 
     const newProvider = {
-      id: req.user.providerId || `p-${Date.now()}`,
+      id: req.user.providerId || `p-${randomUUID()}`,
       name,
       ownerName,
       email,
       phone: typeof phone === 'string' ? phone.trim() : '',
+      district,
       description: description.trim(),
       image,
       location: location.trim(),
@@ -376,8 +402,8 @@ const createApp = () => {
     }
     if (!isActiveRecord(provider)) return res.status(403).json({ success: false, error: 'Provider account is inactive' });
 
-    const { name, description, image, location, phone, latitude, longitude } = req.body || {};
-    if ((name !== undefined && (typeof name !== 'string' || !name.trim())) || (description !== undefined && typeof description !== 'string') || (location !== undefined && typeof location !== 'string') || (phone !== undefined && typeof phone !== 'string') || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
+    const { name, description, image, location, phone, district, latitude, longitude } = req.body || {};
+    if ((name !== undefined && (typeof name !== 'string' || !name.trim())) || (description !== undefined && typeof description !== 'string') || (location !== undefined && typeof location !== 'string') || (phone !== undefined && typeof phone !== 'string') || (district !== undefined && !malawiDistricts.has(district)) || !isValidProfileImage(image) || !validCoordinates(latitude, longitude)) {
       return res.status(400).json({ success: false, error: 'Provider details or image are invalid' });
     }
     const updatedProvider = {
@@ -387,6 +413,7 @@ const createApp = () => {
       ...(image !== undefined ? { image: image || null } : {}),
       ...(location !== undefined ? { location: location.trim() } : {}),
       ...(phone !== undefined ? { phone: phone.trim() } : {}),
+      ...(district !== undefined ? { district } : {}),
       ...(latitude !== undefined && longitude !== undefined ? { latitude, longitude } : {})
     };
     await providerRepository.save(updatedProvider);
@@ -454,7 +481,7 @@ const createApp = () => {
     }
 
     const newItem = {
-      id: `m-${Date.now()}`,
+      id: `m-${randomUUID()}`,
       providerId,
       name,
       description: description || '',

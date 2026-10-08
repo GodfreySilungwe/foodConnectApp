@@ -10,6 +10,7 @@ import FormBackLink from '@/components/common/FormBackLink';
 import LocationPicker from '@/components/common/LocationPicker';
 import { compressImage } from '@/utils/images';
 import { getCoordinatesOrCurrentPosition } from '@/utils/location';
+import { malawiDistricts } from '@/utils/malawiDistricts';
 import '@/styles/pages/Auth.css';
 import '@/styles/components/ProfileImageUpload.css';
 
@@ -19,6 +20,7 @@ export default function ProviderProfilePage() {
   const [form, setForm] = useState({
     name: '',
     phone: '',
+    district: '',
     description: '',
     image: '',
     location: '',
@@ -45,6 +47,7 @@ export default function ProviderProfilePage() {
         setForm({
           name: data.name || '',
           phone: data.phone || user.phone || '',
+          district: data.district || user.district || '',
           description: data.description || '',
           image: data.image || '',
           location: data.location || '',
@@ -96,6 +99,7 @@ export default function ProviderProfilePage() {
         ownerName: user.name,
         email: user.email,
         phone: form.phone.trim(),
+        district: form.district,
         description: form.description.trim(),
         image: form.image || null,
         location: form.location.trim(),
@@ -153,6 +157,13 @@ export default function ProviderProfilePage() {
               <div className="form-group">
                 <label htmlFor="provider-location">Provider location</label>
                 <input id="provider-location" value={form.location} onChange={update('location')} required maxLength={160} placeholder="Town, district, or address" disabled={submitting} />
+              </div>
+              <div className="form-group">
+                <label htmlFor="provider-district">District</label>
+                <select id="provider-district" value={form.district} onChange={update('district')} required disabled={submitting}>
+                  <option value="">Choose district</option>
+                  {malawiDistricts.map((district) => <option key={district} value={district}>{district}</option>)}
+                </select>
               </div>
               <LocationPicker
                 value={{ latitude: form.latitude, longitude: form.longitude }}

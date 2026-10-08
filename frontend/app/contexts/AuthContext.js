@@ -39,7 +39,13 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     const result = await api.register(userData);
     if (result.success && result.data) {
-      // Auto-login after registration
+      if (result.data.token && result.data.user) {
+        const session = { token: result.data.token, user: result.data.user };
+        setUser(session.user);
+        setToken(session.token);
+        localStorage.setItem('foodconnect-session', JSON.stringify(session));
+        return session;
+      }
       return await login(userData.email, userData.password);
     }
     throw new Error(result.error || 'Registration failed');

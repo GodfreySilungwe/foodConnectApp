@@ -7,6 +7,7 @@ import { NotificationContext } from '@/contexts/NotificationContext';
 import LocationPicker from '@/components/common/LocationPicker';
 import { api } from '@/services/api';
 import { getCoordinatesOrCurrentPosition } from '@/utils/location';
+import { malawiDistricts } from '@/utils/malawiDistricts';
 import { formatMWK } from '@/utils/formatCurrency';
 import Link from 'next/link';
 import '@/styles/components/MenuCard.css';
@@ -36,7 +37,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
   const [showSignup, setShowSignup] = useState(false);
   const [showSignin, setShowSignin] = useState(false);
   const [signupError, setSignupError] = useState('');
-  const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '', phone: '', latitude: null, longitude: null });
+  const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '', phone: '', district: '', latitude: null, longitude: null });
   const [estimatedDistanceKm, setEstimatedDistanceKm] = useState(null);
   const [signinForm, setSigninForm] = useState({ email: '', password: '' });
   const [schools, setSchools] = useState([]);
@@ -173,7 +174,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
       setStudentName('');
       setStudentClass('');
       setFoodPreferences('');
-      setSignupForm({ name: '', email: '', password: '', phone: '', latitude: null, longitude: null });
+      setSignupForm({ name: '', email: '', password: '', phone: '', district: '', latitude: null, longitude: null });
       setShowSignup(false);
       setShowCheckout(false);
     } catch (error) {
@@ -321,6 +322,12 @@ export default function MenuCard({ item, showProvider = false, providerControls 
               </label>
               <label className="checkout-field" htmlFor={`parent-phone-${item.id}`}>Phone number
                 <input id={`parent-phone-${item.id}`} type="tel" value={signupForm.phone} onChange={(event) => setSignupForm({ ...signupForm, phone: event.target.value })} required autoComplete="tel" />
+              </label>
+              <label className="checkout-field" htmlFor={`parent-district-${item.id}`}>District
+                <select id={`parent-district-${item.id}`} value={signupForm.district} onChange={(event) => setSignupForm({ ...signupForm, district: event.target.value })} required>
+                  <option value="">Choose your district</option>
+                  {malawiDistricts.map((district) => <option key={district} value={district}>{district}</option>)}
+                </select>
               </label>
               <label className="checkout-field" htmlFor={`parent-password-${item.id}`}>Password
                 <input id={`parent-password-${item.id}`} type="password" minLength={6} value={signupForm.password} onChange={(event) => setSignupForm({ ...signupForm, password: event.target.value })} required autoComplete="new-password" />

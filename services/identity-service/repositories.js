@@ -17,6 +17,14 @@ class MemoryUserRepository {
     return this.users.find((user) => user.email === normalizedEmail);
   }
 
+  async findById(userId) {
+    return this.users.find((user) => user.id === userId) || null;
+  }
+
+  async listByDistrictRole(district, role) {
+    return this.users.filter((user) => user.district === district && user.role === role);
+  }
+
   async save(user) {
     const normalizedUser = {
       ...user,
@@ -30,37 +38,40 @@ class MemoryUserRepository {
 }
 
 class DynamoUserRepository {
+  constructor() {
+    this.initialization = null;
+  }
+
+  async initialize() {
+    if (!this.initialization) {
+      this.initialization = Promise.all(this.seedUsers.map(async (user) => {
+        if (!await dynamo.getUser(user.id)) await dynamo.saveUser(user);
+      })).catch((error) => {
+        this.initialization = null;
+        throw error;
+      });
+    }
+    await this.initialization;
+  }
+
   async list() {
-    const storedUsers = await dynamo.listUsers();
-    const storedIds = new Set(storedUsers.map((user) => user.id));
-    const missingUsers = this.seedUsers.filter((user) => !storedIds.has(user.id));
-    const seedById = new Map(this.seedUsers.map((user) => [user.id, user]));
-    const migratedUsers = storedUsers.map((user) => {
-      const seedUser = seedById.get(user.id);
-      if (!seedUser) return user;
-
-      const migratedUser = { ...user };
-      if (!migratedUser.providerId && seedUser.providerId) migratedUser.providerId = seedUser.providerId;
-      if (!migratedUser.role && seedUser.role) migratedUser.role = seedUser.role;
-      return migratedUser;
-    });
-
-    const changedUsers = migratedUsers.filter((user, index) => user !== storedUsers[index]);
-    if (changedUsers.length > 0) {
-      await Promise.all(changedUsers.map((user) => dynamo.saveUser(user)));
-    }
-
-    if (missingUsers.length > 0) {
-      await Promise.all(missingUsers.map((user) => dynamo.saveUser(user)));
-      return [...migratedUsers, ...missingUsers];
-    }
-    return migratedUsers;
+    await this.initialize();
+    return dynamo.listUsers();
   }
 
   async findByEmail(email) {
-    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    const users = await this.list();
-    return users.find((user) => user.email === normalizedEmail);
+    await this.initialize();
+    return dynamo.findUserByEmail(email);
+  }
+
+  async findById(userId) {
+    await this.initialize();
+    return dynamo.getUser(userId);
+  }
+
+  async listByDistrictRole(district, role) {
+    await this.initialize();
+    return dynamo.listUsersByDistrictRole(district, role);
   }
 
   async save(user) {
@@ -78,7 +89,11 @@ class DynamoUserRepository {
 }
 
 function createUserRepository(seedUsers) {
-  if (dynamo.enabled) return new DynamoUserRepository().withSeed(seedUsers);
+  if (dynamo.enabled) {
+    const repository = new DynamoUserRepository();
+    repository.seedUsers = seedUsers;
+    return repository;
+  }
   return new MemoryUserRepository(seedUsers);
 }
 

@@ -285,6 +285,398 @@ resource "aws_dynamodb_table" "orders" {
   }
 }
 
+resource "aws_dynamodb_table" "users_v2" {
+  name                        = "${var.project_name}-${var.environment}-users-v2"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "id"
+  deletion_protection_enabled = true
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "DistrictRoleIndex"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "GlobalUsersIndex"
+    hash_key        = "gsi2pk"
+    range_key       = "gsi2sk"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
+resource "aws_dynamodb_table" "providers_v2" {
+  name                        = "${var.project_name}-${var.environment}-providers-v2"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "id"
+  deletion_protection_enabled = true
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi4pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi4sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi5pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi5sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "DistrictIndex"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "DirectoryIndex"
+    hash_key        = "gsi2pk"
+    range_key       = "gsi2sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "OwnerIndex"
+    hash_key        = "gsi3pk"
+    range_key       = "gsi3sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "SchoolCoverageIndex"
+    hash_key        = "gsi4pk"
+    range_key       = "gsi4sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "NameIndex"
+    hash_key        = "gsi5pk"
+    range_key       = "gsi5sk"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
+resource "aws_dynamodb_table" "menus_v2" {
+  name                        = "${var.project_name}-${var.environment}-menus-v2"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "id"
+  deletion_protection_enabled = true
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "ProviderMenuIndex"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "DirectoryIndex"
+    hash_key        = "gsi2pk"
+    range_key       = "gsi2sk"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
+resource "aws_dynamodb_table" "schools_v2" {
+  name                        = "${var.project_name}-${var.environment}-schools-v2"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "id"
+  deletion_protection_enabled = true
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi5pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi5sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "DistrictIndex"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "DirectoryIndex"
+    hash_key        = "gsi2pk"
+    range_key       = "gsi2sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "OwnerIndex"
+    hash_key        = "gsi3pk"
+    range_key       = "gsi3sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "NameIndex"
+    hash_key        = "gsi5pk"
+    range_key       = "gsi5sk"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
+resource "aws_dynamodb_table" "orders_v2" {
+  name                        = "${var.project_name}-${var.environment}-orders-v2"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "pk"
+  range_key                   = "sk"
+  deletion_protection_enabled = true
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi4pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi4sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "KitchenDateIndex"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "KitchenTimelineIndex"
+    hash_key        = "gsi2pk"
+    range_key       = "gsi2sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "CustomerTimelineIndex"
+    hash_key        = "gsi3pk"
+    range_key       = "gsi3sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "GlobalTimelineIndex"
+    hash_key        = "gsi4pk"
+    range_key       = "gsi4sk"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
+resource "aws_dynamodb_table" "payments_v2" {
+  name                        = "${var.project_name}-${var.environment}-payments-v2"
+  billing_mode                = "PAY_PER_REQUEST"
+  hash_key                    = "pk"
+  range_key                   = "sk"
+  deletion_protection_enabled = true
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi2sk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3pk"
+    type = "S"
+  }
+  attribute {
+    name = "gsi3sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "KitchenDateIndex"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "KitchenTimelineIndex"
+    hash_key        = "gsi2pk"
+    range_key       = "gsi2sk"
+    projection_type = "ALL"
+  }
+  global_secondary_index {
+    name            = "OrderPaymentsIndex"
+    hash_key        = "gsi3pk"
+    range_key       = "gsi3sk"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+}
+
 data "aws_availability_zones" "available" {
   state = "available"
 }

@@ -56,7 +56,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(user),
     }),
-  getAdminUsers: (token) => request(`${urls.identity}/api/admin/users`, {}, token),
+  getAdminUsers: (token, district, role) => {
+    const search = new URLSearchParams({ district, role }).toString();
+    return request(`${urls.identity}/api/admin/users?${search}`, {}, token);
+  },
   updateAdminUserStatus: (userId, status, token) =>
     request(`${urls.identity}/api/admin/users/${encodeURIComponent(userId)}/status`, {
       method: 'PATCH',
@@ -66,13 +69,13 @@ export const api = {
   // Providers
   getProviders: () => request(`${urls.provider}/api/providers`),
   getProvider: (id) => request(`${urls.provider}/api/providers/${id}`),
-  getAdminProviders: (token) => request(`${urls.provider}/api/admin/providers`, {}, token),
+  getAdminProviders: (token, district) => request(`${urls.provider}/api/admin/providers?${new URLSearchParams({ district })}`, {}, token),
   updateAdminProviderStatus: (id, status, token) =>
     request(`${urls.provider}/api/admin/providers/${encodeURIComponent(id)}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }, token),
-  getAdminSchools: (token) => request(`${urls.provider}/api/admin/schools`, {}, token),
+  getAdminSchools: (token, district) => request(`${urls.provider}/api/admin/schools?${new URLSearchParams({ district })}`, {}, token),
   updateAdminSchoolStatus: (id, status, token) =>
     request(`${urls.provider}/api/admin/schools/${encodeURIComponent(id)}/status`, {
       method: 'PATCH',
@@ -152,7 +155,14 @@ export const api = {
       },
       token
     ),
-  getOrders: (token) => request(`${urls.order}/api/orders`, {}, token),
+  getOrders: (token, filters = {}) => {
+    const search = new URLSearchParams(filters).toString();
+    return request(`${urls.order}/api/orders${search ? `?${search}` : ''}`, {}, token);
+  },
+  getPayments: (token, filters = {}) => {
+    const search = new URLSearchParams(filters).toString();
+    return request(`${urls.order}/api/payments${search ? `?${search}` : ''}`, {}, token);
+  },
   getOrder: (id, token) => request(`${urls.order}/api/orders/${id}`, {}, token),
   updateOrderStatus: (id, status, token) =>
     request(

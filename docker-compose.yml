@@ -68,11 +68,12 @@ services:
       PORT: 3002
       NODE_ENV: development
       USE_DYNAMODB: "true"
+      DYNAMODB_AUTO_CREATE_TABLES: "true"
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
       AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
-      USERS_TABLE: foodconnect-dev-users
+      USERS_TABLE: foodconnect-dev-users-v2
       JWT_SECRET: foodconnect-development-secret
     depends_on:
       dynamodb-local:
@@ -96,14 +97,16 @@ services:
       PORT: 3003
       NODE_ENV: development
       USE_DYNAMODB: "true"
+      DYNAMODB_AUTO_CREATE_TABLES: "true"
       JWT_SECRET: foodconnect-development-secret
       IDENTITY_SERVICE_URL: http://identity-service:3002
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
       AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
-      PROVIDERS_TABLE: foodconnect-dev-providers
-      MENUS_TABLE: foodconnect-dev-menus
+      PROVIDERS_TABLE: foodconnect-dev-providers-v2
+      MENUS_TABLE: foodconnect-dev-menus-v2
+      SCHOOLS_TABLE: foodconnect-dev-schools-v2
     depends_on:
       dynamodb-local:
         condition: service_healthy
@@ -128,13 +131,15 @@ services:
       PORT: 3004
       NODE_ENV: development
       USE_DYNAMODB: "true"
+      DYNAMODB_AUTO_CREATE_TABLES: "true"
       JWT_SECRET: foodconnect-development-secret
       IDENTITY_SERVICE_URL: http://identity-service:3002
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_REGION: ap-southeast-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
       AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
-      ORDERS_TABLE: foodconnect-dev-orders
+      ORDERS_TABLE: foodconnect-dev-orders-v2
+      PAYMENTS_TABLE: foodconnect-dev-payments-v2
     depends_on:
       dynamodb-local:
         condition: service_healthy

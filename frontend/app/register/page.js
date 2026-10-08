@@ -9,10 +9,11 @@ import AppHeader from '@/components/common/AppHeader';
 import FormBackLink from '@/components/common/FormBackLink';
 import LocationPicker from '@/components/common/LocationPicker';
 import { getCoordinatesOrCurrentPosition } from '@/utils/location';
+import { malawiDistricts } from '@/utils/malawiDistricts';
 import '@/styles/pages/Auth.css';
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'customer', latitude: null, longitude: null });
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', district: '', role: 'customer', latitude: null, longitude: null });
   const [loading, setLoading] = useState(false);
   const [emailExists, setEmailExists] = useState(false);
   const { register } = useContext(AuthContext);
@@ -58,6 +59,7 @@ export default function RegisterPage() {
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group"><label htmlFor="name">Full name</label><input id="name" value={form.name} onChange={update('name')} placeholder="Your name" required disabled={loading} /></div>
             <div className="form-group"><label htmlFor="email">Email address</label><input id="email" type="email" value={form.email} onChange={update('email')} placeholder="you@example.com" required disabled={loading} /></div>
+            <div className="form-group"><label htmlFor="district">District</label><select id="district" value={form.district} onChange={update('district')} required disabled={loading}><option value="">Choose your district</option>{malawiDistricts.map((district) => <option key={district} value={district}>{district}</option>)}</select></div>
             {['customer', 'provider'].includes(form.role) && <div className="form-group"><label htmlFor="phone">Phone number</label><input id="phone" type="tel" value={form.phone} onChange={update('phone')} placeholder="Your phone number" autoComplete="tel" required disabled={loading} /></div>}
             <div className="form-group"><label htmlFor="password">Password</label><input id="password" type="password" minLength="6" value={form.password} onChange={update('password')} placeholder="At least 6 characters" required disabled={loading} /></div>
             <div className="form-group"><label htmlFor="role">I am joining as</label><select id="role" value={form.role} onChange={update('role')} disabled={loading}><option value="customer">Parent or guardian</option><option value="provider">Food provider</option><option value="school">School administrator</option></select></div>

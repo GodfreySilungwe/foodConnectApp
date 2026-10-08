@@ -14,6 +14,7 @@ describe('Identity service auth', () => {
         email: 'alice@example.com',
         password: 'Secret123!',
         role: 'customer',
+        district: 'Lilongwe',
         latitude: -13.9626,
         longitude: 33.7741
       });
@@ -35,7 +36,7 @@ describe('Identity service auth', () => {
   it('allows super-admins to suspend, delete, and restore customer accounts', async () => {
     const registration = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Managed Parent', email: 'managed-parent@example.com', password: 'Secret123!', role: 'customer', latitude: -13.9, longitude: 33.7 });
+      .send({ name: 'Managed Parent', email: 'managed-parent@example.com', password: 'Secret123!', role: 'customer', district: 'Lilongwe', latitude: -13.9, longitude: 33.7 });
     const userId = registration.body.data.userId;
     const login = await request(app)
       .post('/api/auth/login')
@@ -80,6 +81,7 @@ describe('Identity service auth', () => {
         email: ' case-test@example.com ',
         password: 'Secret123!',
         role: 'customer',
+        district: 'Blantyre',
         latitude: -13.9626,
         longitude: 33.7741
       });
@@ -91,6 +93,7 @@ describe('Identity service auth', () => {
         email: 'CASE-TEST@EXAMPLE.COM',
         password: 'Secret123!',
         role: 'customer',
+        district: 'Blantyre',
         latitude: -13.9626,
         longitude: 33.7741
       });
@@ -109,6 +112,7 @@ describe('Identity service auth', () => {
         password: 'Secret123!',
         phone: '+265 991 123 456',
         role: 'customer',
+        district: 'Lilongwe',
         latitude: -13.9626,
         longitude: 33.7741
       });
@@ -118,11 +122,13 @@ describe('Identity service auth', () => {
     expect(response.body.data.latitude).toBe(-13.9626);
     expect(response.body.data.longitude).toBe(33.7741);
     expect(response.body.data.phone).toBe('+265 991 123 456');
+    expect(response.body.data.district).toBe('Lilongwe');
 
     const loginResponse = await request(app)
       .post('/api/auth/login')
       .send({ email: 'parent-coords@example.com', password: 'Secret123!' });
     expect(loginResponse.body.data.user.phone).toBe('+265 991 123 456');
+    expect(loginResponse.body.data.user.district).toBe('Lilongwe');
   });
 
   it('logs in an existing user', async () => {
@@ -153,14 +159,26 @@ describe('Identity service auth', () => {
 
   it('allows an admin to list users without password data', async () => {
     const response = await request(app)
-      .get('/api/admin/users')
+      .get('/api/admin/users?district=Lilongwe&role=customer')
       .set('Authorization', `Bearer ${adminToken}`);
 
     expect(response.statusCode).toBe(200);
     expect(response.body.data).toEqual(expect.arrayContaining([
-      expect.objectContaining({ role: 'admin', email: 'admin@example.com' })
+      expect.objectContaining({ role: 'customer', email: 'alice@example.com', district: 'Lilongwe' })
     ]));
     expect(JSON.stringify(response.body)).not.toContain('passwordHash');
+  });
+
+  it('requires district and role filters for admin account listings', async () => {
+    const unfiltered = await request(app)
+      .get('/api/admin/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const invalidDistrict = await request(app)
+      .get('/api/admin/users?district=Unknown&role=customer')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(unfiltered.statusCode).toBe(400);
+    expect(invalidDistrict.statusCode).toBe(400);
   });
 
   it('does not allow customers to list users', async () => {
@@ -183,7 +201,7 @@ describe('Identity service auth', () => {
   it('assigns a provider ID when registering a provider account', async () => {
     const response = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'New Provider', email: 'new-provider@example.com', password: 'Secret123!', role: 'provider' });
+      .send({ name: 'New Provider', email: 'new-provider@example.com', password: 'Secret123!', role: 'provider', district: 'Blantyre' });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.data.providerId).toMatch(/^p-/);
@@ -192,9 +210,18 @@ describe('Identity service auth', () => {
   it('registers a school administrator account', async () => {
     const response = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'School Office', email: 'school-office@example.com', password: 'Secret123!', role: 'school' });
+      .send({ name: 'School Office', email: 'school-office@example.com', password: 'Secret123!', role: 'school', district: 'Zomba' });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.data.role).toBe('school');
+    expect(response.body.data.district).toBe('Zomba');
+  });
+
+  it('rejects district names outside Malawi’s district list', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Invalid District', email: 'invalid-district@example.com', password: 'Secret123!', role: 'customer', district: 'Lilongwe City', latitude: -13.9, longitude: 33.7 });
+
+    expect(response.statusCode).toBe(400);
   });
 });

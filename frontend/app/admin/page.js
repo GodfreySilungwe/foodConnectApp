@@ -6,6 +6,7 @@ import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import AppHeader from '@/components/common/AppHeader';
 import { api } from '@/services/api';
+import { malawiDistricts } from '@/utils/malawiDistricts';
 import '@/styles/pages/Admin.css';
 
 const views = [
@@ -17,14 +18,17 @@ const views = [
 
 const statusOf = (record) => record.status || 'active';
 
-async function loadAdminData(token) {
-  const [usersResult, providersResult, schoolsResult] = await Promise.all([
-    api.getAdminUsers(token),
-    api.getAdminProviders(token),
-    api.getAdminSchools(token),
+async function loadAdminData(token, district) {
+  const [parentsResult, providerAccountsResult, schoolAccountsResult, providersResult, schoolsResult] = await Promise.all([
+    api.getAdminUsers(token, district, 'customer'),
+    api.getAdminUsers(token, district, 'provider'),
+    api.getAdminUsers(token, district, 'school'),
+    api.getAdminProviders(token, district),
+    api.getAdminSchools(token, district),
   ]);
-  const users = usersResult.data || [];
-  const providerAccounts = users.filter((user) => user.role === 'provider');
+  const parents = parentsResult.data || [];
+  const providerAccounts = providerAccountsResult.data || [];
+  const schoolAccounts = schoolAccountsResult.data || [];
   const matchedAccountIds = new Set();
   const providers = (providersResult.data || []).map((provider) => {
     const account = providerAccounts.find((candidate) =>
@@ -41,9 +45,9 @@ async function loadAdminData(token) {
     hasProviderProfile: false,
   })));
   return {
-    parents: users.filter((user) => user.role === 'customer'),
+    parents,
     providers,
-    schoolAccounts: users.filter((user) => user.role === 'school'),
+    schoolAccounts,
     schools: schoolsResult.data || [],
   };
 }
@@ -53,15 +57,17 @@ export default function AdminPage() {
   const { showNotification } = useContext(NotificationContext);
   const [records, setRecords] = useState({ parents: [], providerAccounts: [], providers: [], schoolAccounts: [], schools: [] });
   const [activeView, setActiveView] = useState('parents');
+  const [district, setDistrict] = useState('');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyKey, setBusyKey] = useState('');
 
   const refresh = async () => {
+    if (!district) return;
     setLoading(true);
     try {
-      setRecords(await loadAdminData(token));
+      setRecords(await loadAdminData(token, district));
       setError('');
     } catch (requestError) {
       setError(requestError.message || 'Could not load account records');
@@ -76,13 +82,18 @@ export default function AdminPage() {
       setLoading(false);
       return;
     }
+    if (!district) {
+      setLoading(false);
+      return;
+    }
     let active = true;
-    loadAdminData(token)
+    setLoading(true);
+    loadAdminData(token, district)
       .then((data) => { if (active) setRecords(data); })
       .catch((requestError) => { if (active) setError(requestError.message || 'Could not load account records'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [authLoading, token, user]);
+  }, [authLoading, district, token, user]);
 
   const setStatus = async (view, record, status) => {
     if (status === 'deleted' && !window.confirm(`Delete ${record.name || record.email || 'this record'}? It can be restored later.`)) return;
@@ -103,7 +114,7 @@ export default function AdminPage() {
           throw accountError;
         }
       }
-      setRecords(await loadAdminData(token));
+      setRecords(await loadAdminData(token, district));
       showNotification('Record status updated.', 'success');
     } catch (requestError) {
       showNotification(requestError.message || 'Could not update record status', 'error');
@@ -130,6 +141,13 @@ export default function AdminPage() {
         </section>
       ) : error ? <p className="checkout-error" role="alert">{error}</p> : (
         <>
+          <label className="admin-search-label" htmlFor="admin-district">Filter by district</label>
+          <select id="admin-district" className="admin-search" value={district} onChange={(event) => { setError(''); setLoading(true); setDistrict(event.target.value); }}>
+            <option value="">Choose a district</option>
+            <option value="UNKNOWN">Unassigned district</option>
+            {malawiDistricts.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+          {!district ? <p>Select a district to load its accounts, providers, and schools.</p> : <>
           <nav className="admin-tabs" role="tablist" aria-label="Account categories">
             {views.map((view) => <button key={view.id} type="button" role="tab" aria-selected={activeView === view.id} onClick={() => setActiveView(view.id)}>{view.label}<span>{records[view.id].length}</span></button>)}
           </nav>
@@ -158,6 +176,7 @@ export default function AdminPage() {
             {!currentRecords.length && <p className="admin-empty">No matching records.</p>}
           </div>
           <button type="button" className="btn btn-sm admin-refresh" onClick={refresh} disabled={loading || Boolean(busyKey)}>Refresh records</button>
+          </>}
         </>
       )}
     </main></>

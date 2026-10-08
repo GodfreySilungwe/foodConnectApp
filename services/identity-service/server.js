@@ -1,8 +1,10 @@
 const express = require('express');
+const { randomUUID } = require('node:crypto');
 const { createUserRepository } = require('./repositories');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { requireAuth } = require('./auth');
+const malawiDistricts = require('./malawi-districts');
 
 const jwtSecret = process.env.JWT_SECRET || 'foodconnect-development-secret';
 
@@ -52,7 +54,7 @@ const createApp = () => {
   });
 
   app.get('/api/auth/session', requireAuth(), async (req, res) => {
-    const user = (await userRepository.list()).find((entry) => entry.id === req.user.userId);
+    const user = await userRepository.findById(req.user.userId);
     if (!user || (user.status && user.status !== 'active')) {
       return res.status(403).json({ success: false, error: 'This account is inactive' });
     }
@@ -66,8 +68,18 @@ const createApp = () => {
   });
 
   app.get('/api/admin/users', requireAuth(['admin', 'superadmin']), async (req, res) => {
-    const users = await userRepository.list();
+    if (!(malawiDistricts.has(req.query.district) || req.query.district === 'UNKNOWN') || !['customer', 'provider', 'school'].includes(req.query.role)) {
+      return res.status(400).json({ success: false, error: 'A valid district and account role are required' });
+    }
+    const users = await userRepository.listByDistrictRole(req.query.district, req.query.role);
     res.json({ success: true, data: users.map(({ password, passwordHash, ...user }) => user) });
+  });
+
+  app.get('/api/admin/users/:userId', requireAuth(['admin', 'superadmin']), async (req, res) => {
+    const user = await userRepository.findById(req.params.userId);
+    if (!user) return res.status(404).json({ success: false, error: 'Account not found' });
+    const { password, passwordHash, ...safeUser } = user;
+    return res.json({ success: true, data: safeUser });
   });
 
   app.patch('/api/admin/users/:userId/status', requireAuth('superadmin'), async (req, res) => {
@@ -75,7 +87,7 @@ const createApp = () => {
     if (!['active', 'suspended', 'deleted'].includes(status)) {
       return res.status(400).json({ success: false, error: 'Status must be active, suspended, or deleted' });
     }
-    const user = (await userRepository.list()).find((entry) => entry.id === req.params.userId);
+    const user = await userRepository.findById(req.params.userId);
     if (!user) return res.status(404).json({ success: false, error: 'Account not found' });
     if (['admin', 'superadmin'].includes(user.role)) {
       return res.status(403).json({ success: false, error: 'Administrator accounts cannot be managed here' });
@@ -87,13 +99,13 @@ const createApp = () => {
   });
 
   app.post('/api/auth/register', async (req, res) => {
-    const { name, email, password, phone, role, latitude, longitude } = req.body || {};
+    const { name, email, password, phone, district, role, latitude, longitude } = req.body || {};
     const normalizedEmail = normalizeEmail(email);
-    if (!name || !normalizedEmail || !password || !['customer', 'provider', 'school'].includes(role)) {
+    if (!name || !normalizedEmail || !password || !['customer', 'provider', 'school'].includes(role) || !malawiDistricts.has(district)) {
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
-        details: ['name, email, password, and role are required']
+        details: ['name, email, password, a valid Malawi district, and role are required']
       });
     }
 
@@ -114,25 +126,56 @@ const createApp = () => {
     }
 
     const newUser = {
-      id: `u-${Date.now()}`,
+      id: `u-${randomUUID()}`,
       name,
       email: normalizedEmail,
+      district,
       passwordHash: await bcrypt.hash(password, 10),
       role,
       ...(typeof phone === 'string' && phone.trim() ? { phone: phone.trim() } : {}),
       latitude: role === 'customer' ? latitude : null,
       longitude: role === 'customer' ? longitude : null,
-      ...(role === 'provider' ? { providerId: `p-${Date.now()}` } : {})
+      ...(role === 'provider' ? { providerId: `p-${randomUUID()}` } : {})
     };
 
-    await userRepository.save(newUser);
+    try {
+      await userRepository.save(newUser);
+    } catch (error) {
+      if (error.code === 'EMAIL_EXISTS') {
+        return res.status(409).json({ success: false, error: 'User already exists' });
+      }
+      throw error;
+    }
+
+    const registeredUser = {
+      userId: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      ...(newUser.phone ? { phone: newUser.phone } : {}),
+      district: newUser.district,
+      role: newUser.role,
+      latitude: newUser.latitude ?? null,
+      longitude: newUser.longitude ?? null,
+      ...(newUser.providerId ? { providerId: newUser.providerId } : {}),
+    };
 
     return res.status(201).json({
       success: true,
       data: {
+        token: jwt.sign({
+          userId: newUser.id,
+          role: newUser.role,
+          email: newUser.email,
+          district: newUser.district,
+          latitude: newUser.latitude ?? null,
+          longitude: newUser.longitude ?? null,
+          ...(newUser.providerId ? { providerId: newUser.providerId } : {}),
+        }, jwtSecret, { expiresIn: '2h' }),
+        user: registeredUser,
         userId: newUser.id,
         name: newUser.name,
         email: newUser.email,
+        district: newUser.district,
         ...(newUser.phone ? { phone: newUser.phone } : {}),
         role: newUser.role,
         latitude: newUser.latitude ?? null,
@@ -181,6 +224,7 @@ const createApp = () => {
           userId: user.id,
           role: user.role,
           email: user.email,
+          district: user.district || null,
           latitude: user.latitude ?? null,
           longitude: user.longitude ?? null,
           ...(user.providerId ? { providerId: user.providerId } : {})
@@ -189,6 +233,7 @@ const createApp = () => {
           userId: user.id,
           name: user.name,
           email: user.email,
+          district: user.district || null,
           ...(user.phone ? { phone: user.phone } : {}),
           role: user.role,
           latitude: user.latitude ?? null,

@@ -27,6 +27,7 @@ describe('Provider service', () => {
         ownerName: 'Jane Doe',
         email: 'green@example.com',
         phone: '+265 991 123 456',
+        district: 'Lilongwe',
         status: 'active',
         schoolIds: ['s-001']
       });
@@ -35,6 +36,7 @@ describe('Provider service', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.name).toBe('Green Bowl');
     expect(response.body.data.phone).toBe('+265 991 123 456');
+    expect(response.body.data.district).toBe('Lilongwe');
     expect(response.body.data.schoolIds).toEqual(['s-001']);
     const schoolResponse = await request(app).get('/api/schools/s-001');
     expect(schoolResponse.body.data.providerCount).toBe(2);
@@ -55,6 +57,7 @@ describe('Provider service', () => {
         name: 'Independent Kitchen',
         ownerName: 'Alex Doe',
         email: 'alex@example.com',
+        district: 'Blantyre',
         location: 'Central District',
         latitude: -13.96,
         longitude: 33.77,
@@ -85,7 +88,7 @@ describe('Provider service', () => {
     const schoolResponse = await request(app)
       .post('/api/schools')
       .set('Authorization', `Bearer ${schoolToken}`)
-      .send({ name: 'Travel Estimate School', location: 'Lilongwe', latitude: -13.96, longitude: 33.77 });
+      .send({ name: 'Travel Estimate School', location: 'Lilongwe', district: 'Lilongwe', latitude: -13.96, longitude: 33.77 });
     expect(schoolResponse.statusCode).toBe(201);
 
     const providerLocationResponse = await request(app)
@@ -300,10 +303,10 @@ describe('Provider service', () => {
     const response = await request(app)
       .post('/api/schools')
       .set('Authorization', `Bearer ${schoolToken}`)
-      .send({ name: 'Northside Primary', location: 'North District', studentCount: 450, image: 'data:image/jpeg;base64,AA==' });
+      .send({ name: 'Northside Primary', location: 'North District', district: 'Mzimba', studentCount: 450, image: 'data:image/jpeg;base64,AA==' });
 
     expect(response.statusCode).toBe(201);
-    expect(response.body.data).toMatchObject({ name: 'Northside Primary', location: 'North District', studentCount: 450, image: 'data:image/jpeg;base64,AA==' });
+    expect(response.body.data).toMatchObject({ name: 'Northside Primary', location: 'North District', district: 'Mzimba', studentCount: 450, image: 'data:image/jpeg;base64,AA==' });
 
     const updateResponse = await request(app)
       .put(`/api/schools/${response.body.data.id}`)
@@ -323,7 +326,7 @@ describe('Provider service', () => {
     const response = await request(app)
       .post('/api/schools')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Admin Registered School', location: 'South District' });
+      .send({ name: 'Admin Registered School', location: 'South District', district: 'Zomba' });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.data).toMatchObject({ name: 'Admin Registered School', studentCount: 0 });
@@ -333,7 +336,7 @@ describe('Provider service', () => {
     const response = await request(app)
       .post('/api/schools')
       .set('Authorization', `Bearer ${providerToken}`)
-      .send({ name: 'Provider Registered School', location: 'West District' });
+      .send({ name: 'Provider Registered School', location: 'West District', district: 'Blantyre' });
 
     expect(response.statusCode).toBe(201);
     expect(response.body.data).toMatchObject({
@@ -350,7 +353,7 @@ describe('Provider service', () => {
     const schoolResponse = await request(app)
       .post('/api/schools')
       .set('Authorization', `Bearer ${schoolToken}`)
-      .send({ name: 'Provider Directory School', location: 'Central District' });
+      .send({ name: 'Provider Directory School', location: 'Central District', district: 'Lilongwe' });
     const schoolId = schoolResponse.body.data.id;
 
     const coverageResponse = await request(app)
@@ -381,6 +384,36 @@ describe('Provider service', () => {
       .send({ name: 'Unverified School', location: 'Anywhere' });
 
     expect(response.statusCode).toBe(403);
+  });
+
+  it('filters providers and schools by district and validates district filters', async () => {
+    const providerResponse = await request(app).get('/api/providers?district=Lilongwe');
+    const schoolResponse = await request(app).get('/api/schools?district=Lilongwe');
+    const invalidResponse = await request(app).get('/api/schools?district=Unknown');
+
+    expect(providerResponse.statusCode).toBe(200);
+    expect(providerResponse.body.data.every((provider) => provider.district === 'Lilongwe')).toBe(true);
+    expect(schoolResponse.statusCode).toBe(200);
+    expect(schoolResponse.body.data.every((school) => school.district === 'Lilongwe')).toBe(true);
+    expect(invalidResponse.statusCode).toBe(400);
+  });
+
+  it('requires district filters for admin provider and school directories', async () => {
+    const providersResponse = await request(app)
+      .get('/api/admin/providers?district=Lilongwe')
+      .set('Authorization', `Bearer ${adminToken}`);
+    const schoolsResponse = await request(app)
+      .get('/api/admin/schools?district=Lilongwe')
+      .set('Authorization', `Bearer ${superAdminToken}`);
+    const unfilteredSchoolsResponse = await request(app)
+      .get('/api/admin/schools')
+      .set('Authorization', `Bearer ${superAdminToken}`);
+
+    expect(providersResponse.statusCode).toBe(200);
+    expect(providersResponse.body.data.every((provider) => provider.district === 'Lilongwe')).toBe(true);
+    expect(schoolsResponse.statusCode).toBe(200);
+    expect(schoolsResponse.body.data.every((school) => school.district === 'Lilongwe')).toBe(true);
+    expect(unfilteredSchoolsResponse.statusCode).toBe(400);
   });
 
   it('rejects menu creation by a customer', async () => {
