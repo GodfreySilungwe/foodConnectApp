@@ -5,6 +5,7 @@ const app = require('../server');
 const providerToken = jwt.sign({ userId: 'u-002', role: 'provider' }, 'foodconnect-development-secret');
 const newProviderToken = jwt.sign({ userId: 'u-004', role: 'provider', providerId: 'p-004' }, 'foodconnect-development-secret');
 const unassociatedProviderToken = jwt.sign({ userId: 'u-005', role: 'provider', providerId: 'p-005' }, 'foodconnect-development-secret');
+const nearbyProviderToken = jwt.sign({ userId: 'u-006', role: 'provider', providerId: 'p-006' }, 'foodconnect-development-secret');
 const customerToken = jwt.sign({ userId: 'u-001', role: 'customer' }, 'foodconnect-development-secret');
 const schoolToken = jwt.sign({ userId: 'u-school', role: 'school' }, 'foodconnect-development-secret');
 const adminToken = jwt.sign({ userId: 'u-admin', role: 'admin' }, 'foodconnect-development-secret');
@@ -82,6 +83,45 @@ describe('Provider service', () => {
       .set('Authorization', `Bearer ${customerToken}`)
       .send({ schoolIds: [] });
     expect(unauthorizedResponse.statusCode).toBe(403);
+  });
+
+  it('sorts providers and schools by distance from the supplied coordinates', async () => {
+    const nearbyProviderResponse = await request(app)
+      .post('/api/providers')
+      .set('Authorization', `Bearer ${nearbyProviderToken}`)
+      .send({
+        name: 'Nearest Kitchen',
+        ownerName: 'Nearby Owner',
+        email: 'nearest-kitchen@example.com',
+        district: 'Lilongwe',
+        location: 'Lilongwe CBD',
+        latitude: -13.9626,
+        longitude: 33.7741,
+        schoolIds: []
+      });
+    expect(nearbyProviderResponse.statusCode).toBe(201);
+
+    const nearbySchoolResponse = await request(app)
+      .post('/api/schools')
+      .set('Authorization', `Bearer ${schoolToken}`)
+      .send({
+        name: 'Nearby School',
+        location: 'Lilongwe West',
+        district: 'Lilongwe',
+        studentCount: 400,
+        latitude: -13.9626,
+        longitude: 33.7741,
+        image: 'data:image/jpeg;base64,AA=='
+      });
+    expect(nearbySchoolResponse.statusCode).toBe(201);
+
+    const nearbyProviders = await request(app).get('/api/providers?latitude=-13.9626&longitude=33.7741');
+    expect(nearbyProviders.statusCode).toBe(200);
+    expect(nearbyProviders.body.data[0].name).toBe('Nearest Kitchen');
+
+    const nearbySchools = await request(app).get('/api/schools?latitude=-13.9626&longitude=33.7741');
+    expect(nearbySchools.statusCode).toBe(200);
+    expect(nearbySchools.body.data[0].name).toBe('Nearby School');
   });
 
   it('returns distance and approximate delivery time for located provider-school pairs', async () => {

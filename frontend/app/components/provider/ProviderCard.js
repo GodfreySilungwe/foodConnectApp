@@ -13,6 +13,7 @@ export default function ProviderCard({ provider }) {
   const ratingValue = Number(provider?.rating ?? provider?.averageRating ?? 0) || 0;
   const starCount = Math.min(5, Math.max(0, Math.round(ratingValue)));
   const stars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
+  const distanceText = Number.isFinite(provider?.distanceKm) ? `${provider.distanceKm.toFixed(1)} km away` : null;
 
   return (
     <Link href={`/providers/${provider.id}`} className="provider-card">
@@ -40,7 +41,7 @@ export default function ProviderCard({ provider }) {
         <div className="provider-card-meta">
           <span>{stars} {ratingValue ? ratingValue.toFixed(1) : 'No ratings yet'}</span>
           <span>🕒 {provider.hours || '8:00 AM - 8:00 PM'}</span>
-          <span>📍 {provider.location || 'Nearby'}</span>
+          <span>📍 {distanceText || provider.location || 'Nearby'}</span>
         </div>
         <div className="provider-card-footer">
           <span className="provider-card-menu-count">

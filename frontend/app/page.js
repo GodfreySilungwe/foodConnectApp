@@ -20,6 +20,7 @@ export default function HomePage() {
   const [schools, setSchools] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState(null);
   const [stats, setStats] = useState({
     totalProviders: 0,
     totalSchools: 0,
@@ -30,10 +31,15 @@ export default function HomePage() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        const location = user && Number.isFinite(user.latitude) && Number.isFinite(user.longitude)
+          ? { latitude: user.latitude, longitude: user.longitude }
+          : null;
+        setUserLocation(location);
+
         const [providersRes, menuRes, schoolsRes] = await Promise.all([
-          api.getProviders(),
+          api.getProviders(location ? `?latitude=${location.latitude}&longitude=${location.longitude}` : ''),
           api.getFeaturedMenu(),
-          api.getSchools(),
+          api.getSchools(location ? `?latitude=${location.latitude}&longitude=${location.longitude}` : ''),
         ]);
 
         setFeaturedProviders(providersRes.data || []);
@@ -56,7 +62,18 @@ export default function HomePage() {
     loadData();
   }, []);
 
-  const filteredSchools = schools.filter((school) => matchesSearch(query, school.name, school.location));
+  const sortedSchools = userLocation ? [...schools].sort((left, right) => {
+    const leftDistance = Number(left.distanceKm ?? Infinity);
+    const rightDistance = Number(right.distanceKm ?? Infinity);
+    return leftDistance - rightDistance;
+  }) : schools;
+  const sortedProviders = userLocation ? [...featuredProviders].sort((left, right) => {
+    const leftDistance = Number(left.distanceKm ?? Infinity);
+    const rightDistance = Number(right.distanceKm ?? Infinity);
+    return leftDistance - rightDistance;
+  }) : featuredProviders;
+
+  const filteredSchools = sortedSchools.filter((school) => matchesSearch(query, school.name, school.location));
   const filteredMenu = featuredMenu.filter((item) => matchesSearch(
     query,
     item.name,
@@ -64,7 +81,7 @@ export default function HomePage() {
     item.providerName,
     item.availableSchools?.map((school) => school.name).join(' ')
   ));
-  const filteredProviders = featuredProviders.filter((provider) => matchesSearch(
+  const filteredProviders = sortedProviders.filter((provider) => matchesSearch(
     query,
     provider.name,
     provider.ownerName,

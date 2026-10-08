@@ -4,6 +4,8 @@ import Link from 'next/link';
 import '@/styles/components/SchoolCard.css';
 
 export default function SchoolCard({ school }) {
+  const distanceText = Number.isFinite(school?.distanceKm) ? `${school.distanceKm.toFixed(1)} km away` : null;
+
   return (
     <Link href={`/schools/${school.id}`} className="school-card">
       <div className="school-card-icon">
@@ -15,7 +17,7 @@ export default function SchoolCard({ school }) {
       </div>
       <div className="school-card-body">
         <h4 className="school-card-name">{school.name}</h4>
-        <p className="school-card-location">📍 {school.location || 'Location not specified'}</p>
+        <p className="school-card-location">📍 {distanceText || school.location || 'Location not specified'}</p>
         <p className="school-card-students">
           👨‍🎓 {school.studentCount || 0} students
         </p>

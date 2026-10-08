@@ -13,17 +13,39 @@ export default function ProvidersPage() {
   const [schools, setSchools] = useState([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [location, setLocation] = useState(null);
 
   useEffect(() => {
-    Promise.all([api.getProviders(), api.getSchools()])
+    const current = typeof navigator !== 'undefined' && navigator.geolocation
+      ? navigator.geolocation
+      : null;
+
+    if (current) {
+      current.getCurrentPosition(
+        ({ coords }) => setLocation({ latitude: coords.latitude, longitude: coords.longitude }),
+        () => setLocation(null),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    Promise.all([
+      api.getProviders(location ? `?latitude=${location.latitude}&longitude=${location.longitude}` : ''),
+      api.getSchools(location ? `?latitude=${location.latitude}&longitude=${location.longitude}` : ''),
+    ])
       .then(([providerResult, schoolResult]) => {
         setProviders(providerResult.data || []);
         setSchools(schoolResult.data || []);
       })
       .catch((requestError) => setError(requestError.message));
-  }, []);
+  }, [location]);
 
-  const filteredProviders = providers.filter((provider) => matchesSearch(
+  const sortedProviders = location ? [...providers].sort((left, right) => {
+    const leftDistance = Number(left.distanceKm ?? Infinity);
+    const rightDistance = Number(right.distanceKm ?? Infinity);
+    return leftDistance - rightDistance;
+  }) : providers;
+
+  const filteredProviders = sortedProviders.filter((provider) => matchesSearch(
     query,
     provider.name,
     provider.ownerName,

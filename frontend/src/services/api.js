@@ -11,6 +11,19 @@ const urls = {
   order: serviceUrl(process.env.NEXT_PUBLIC_ORDER_API_URL, 'http://localhost:3004'),
 };
 
+const buildQuery = (filters = {}) => {
+  if (typeof filters === 'string' && filters.trim()) {
+    return filters.startsWith('?') ? filters : `?${filters}`;
+  }
+  const search = new URLSearchParams();
+  Object.entries(filters || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return;
+    search.set(key, String(value));
+  });
+  const query = search.toString();
+  return query ? `?${query}` : '';
+};
+
 async function request(url, options = {}, token) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -67,7 +80,7 @@ export const api = {
     }, token),
 
   // Providers
-  getProviders: () => request(`${urls.provider}/api/providers`),
+  getProviders: (filters = {}) => request(`${urls.provider}/api/providers${buildQuery(filters)}`),
   getProvider: (id) => request(`${urls.provider}/api/providers/${id}`),
   getAdminProviders: (token, district) => request(`${urls.provider}/api/admin/providers?${new URLSearchParams({ district })}`, {}, token),
   updateAdminProviderStatus: (id, status, token) =>
@@ -175,7 +188,7 @@ export const api = {
     ),
 
   // Schools
-  getSchools: () => request(`${urls.provider}/api/schools`),
+  getSchools: (filters = {}) => request(`${urls.provider}/api/schools${buildQuery(filters)}`),
   getSchool: (id) => request(`${urls.provider}/api/schools/${id}`),
   getSchoolProviders: (id, token) => request(`${urls.provider}/api/schools/${id}/providers`, {}, token),
   updateSchool: (id, school, token) =>

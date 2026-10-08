@@ -39,6 +39,22 @@ const createApp = () => {
       Math.cos(radians(first.latitude)) * Math.cos(radians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
     return Math.round(6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)) * 10) / 10;
   };
+  const sortByDistance = (items, origin) => {
+    if (!Number.isFinite(origin?.latitude) || !Number.isFinite(origin?.longitude)) return items.map((item) => ({ ...item, distanceKm: null }));
+    return [...items]
+      .map((item) => ({
+        ...item,
+        distanceKm: Number.isFinite(item.latitude) && Number.isFinite(item.longitude)
+          ? distanceKmBetween(origin, { latitude: item.latitude, longitude: item.longitude })
+          : null,
+      }))
+      .sort((left, right) => {
+        if (left.distanceKm == null && right.distanceKm == null) return 0;
+        if (left.distanceKm == null) return 1;
+        if (right.distanceKm == null) return -1;
+        return left.distanceKm - right.distanceKm;
+      });
+  };
   app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_ORIGIN || 'http://localhost:3000');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -128,11 +144,17 @@ const createApp = () => {
     if (req.query.district !== undefined && !malawiDistricts.has(req.query.district)) {
       return res.status(400).json({ success: false, error: 'Choose a valid Malawi district' });
     }
+    const latitude = Number(req.query.latitude);
+    const longitude = Number(req.query.longitude);
+    const hasUserCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
     const records = req.query.district
       ? await providerRepository.listByDistrict(req.query.district)
       : await providerRepository.list();
-    const providers = records.filter(isActiveRecord);
-    res.json({ success: true, data: providers.map(withProviderRatingSummary) });
+    const providers = records.filter(isActiveRecord).map(withProviderRatingSummary);
+    const rankedProviders = hasUserCoordinates
+      ? sortByDistance(providers, { latitude, longitude })
+      : providers;
+    res.json({ success: true, data: rankedProviders });
   });
 
   app.post('/api/providers/:providerId/ratings', requireAuth('customer'), async (req, res) => {
@@ -210,11 +232,17 @@ const createApp = () => {
     if (req.query.district !== undefined && !malawiDistricts.has(req.query.district)) {
       return res.status(400).json({ success: false, error: 'Choose a valid Malawi district' });
     }
-    if (req.query.district) {
-      const schools = await schoolRepository.listByDistrict(req.query.district);
-      return res.json({ success: true, data: schools.filter(isActiveRecord) });
-    }
-    return res.json({ success: true, data: (await schoolRepository.list()).filter(isActiveRecord) });
+    const latitude = Number(req.query.latitude);
+    const longitude = Number(req.query.longitude);
+    const hasUserCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+    const records = req.query.district
+      ? await schoolRepository.listByDistrict(req.query.district)
+      : await schoolRepository.list();
+    const schools = records.filter(isActiveRecord);
+    const rankedSchools = hasUserCoordinates
+      ? sortByDistance(schools, { latitude, longitude })
+      : schools;
+    return res.json({ success: true, data: rankedSchools });
   });
 
   app.get('/api/schools/:schoolId', async (req, res) => {
