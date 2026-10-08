@@ -12,6 +12,7 @@ const {
   UpdateCommand,
 } = require('@aws-sdk/lib-dynamodb');
 const { SHARD_COUNT } = require('./schema');
+const { decodeCursor, encodeCursor } = require('./pagination');
 
 const enabled = process.env.USE_DYNAMODB === 'true';
 const autoCreate = process.env.DYNAMODB_AUTO_CREATE_TABLES === 'true';
@@ -92,7 +93,7 @@ async function ensureTable(tableName, indexes) {
   await readyTables.get(tableName);
 }
 
-async function queryAll({ tableName, indexName, partitionName, partitionValue, sortName, from, to }) {
+async function queryPage({ tableName, indexName, partitionName, partitionValue, sortName, from, to, cursorKey, limit }) {
   const names = { '#partition': partitionName };
   const values = { ':partition': partitionValue };
   let keyCondition = '#partition = :partition';
@@ -111,29 +112,54 @@ async function queryAll({ tableName, indexName, partitionName, partitionValue, s
     keyCondition += ' AND #sort <= :to';
   }
 
-  const items = [];
-  let ExclusiveStartKey;
-  do {
-    const result = await client.send(new QueryCommand({
-      TableName: tableName,
-      ...(indexName ? { IndexName: indexName } : {}),
-      KeyConditionExpression: keyCondition,
-      ExpressionAttributeNames: names,
-      ExpressionAttributeValues: values,
-      ExclusiveStartKey,
-      ScanIndexForward: true,
-    }));
-    items.push(...(result.Items || []));
-    ExclusiveStartKey = result.LastEvaluatedKey;
-  } while (ExclusiveStartKey);
-  return items;
+  const result = await client.send(new QueryCommand({
+    TableName: tableName,
+    ...(indexName ? { IndexName: indexName } : {}),
+    KeyConditionExpression: keyCondition,
+    ExpressionAttributeNames: names,
+    ExpressionAttributeValues: values,
+    ExclusiveStartKey: cursorKey,
+    Limit: limit,
+    ScanIndexForward: true,
+  }));
+  return { items: result.Items || [], lastEvaluatedKey: result.LastEvaluatedKey || null };
 }
 
-async function queryShards(query, partitionForShard, timestampField = 'serviceAt') {
-  const results = await Promise.all(Array.from({ length: SHARD_COUNT }, (_, shard) => query({
-    ...partitionForShard(shard),
-  })));
-  return results.flat().sort((left, right) => left[timestampField].localeCompare(right[timestampField]));
+function orderCursorKey(item, index) {
+  return { pk: item.pk, sk: item.sk, [index.pk]: item[index.pk], [index.sk]: item[index.sk] };
+}
+
+function paymentCursorKey(item, index) {
+  return { pk: item.pk, sk: item.sk, [index.pk]: item[index.pk], [index.sk]: item[index.sk] };
+}
+
+async function queryShardsPage({ query, partitionForShard, scope, cursor, limit, index, timestampField = 'serviceAt', keyForItem }) {
+  const state = decodeCursor(cursor, scope, SHARD_COUNT);
+  const results = await Promise.all(Array.from({ length: SHARD_COUNT }, async (_, shard) => {
+    if (state.done[shard]) return { shard, items: [], lastEvaluatedKey: null };
+    const result = await query({ ...partitionForShard(shard), cursorKey: state.positions[shard], limit });
+    return { ...result, shard };
+  }));
+  const ordered = results.flatMap(({ shard, items }) => items.map((item) => ({ shard, item })))
+    .sort((left, right) => left.item[timestampField].localeCompare(right.item[timestampField]) || left.item.id.localeCompare(right.item.id));
+  const selected = ordered.slice(0, limit);
+  const positions = [...state.positions];
+  const done = [...state.done];
+
+  for (const result of results) {
+    const selectedFromShard = selected.filter((entry) => entry.shard === result.shard);
+    const unconsumed = selectedFromShard.length < result.items.length;
+    if (selectedFromShard.length) positions[result.shard] = keyForItem(selectedFromShard[selectedFromShard.length - 1].item, index);
+    if (!result.lastEvaluatedKey && !unconsumed) done[result.shard] = true;
+    else done[result.shard] = false;
+  }
+
+  const hasMore = done.some((shardDone) => !shardDone);
+  return {
+    items: selected.map(({ item }) => item),
+    hasMore,
+    nextCursor: hasMore ? encodeCursor(scope, { positions, done }) : null,
+  };
 }
 
 async function ensureOrdersTable() {
@@ -161,60 +187,52 @@ async function findOrder(orderId) {
   return result.Item || null;
 }
 
-async function listOrdersByKitchenDate(providerId, day, from, to) {
+async function listOrdersByKitchenDate(providerId, day, from, to, { cursor, limit }) {
   if (!enabled) return null;
   await ensureOrdersTable();
-  return queryShards((partition) => queryAll({
-    tableName: ordersTable,
-    indexName: 'KitchenDateIndex',
-    partitionName: 'gsi1pk',
-    sortName: 'gsi1sk',
-    from: from ? `SERVICE_AT#${from}` : null,
-    to: to ? `SERVICE_AT#${to}` : null,
-    ...partition,
-  }), (shard) => ({ partitionValue: `KITCHEN#${providerId}#DAY#${day}#SHARD#${shard}` }));
+  const index = orderIndexes[0];
+  const scope = JSON.stringify(['orders-kitchen-date', providerId, day, from, to, limit]);
+  return queryShardsPage({
+    query: (partition) => queryPage({ tableName: ordersTable, indexName: index.name, partitionName: index.pk, sortName: index.sk, from: from ? `SERVICE_AT#${from}` : null, to: to ? `SERVICE_AT#${to}` : null, ...partition }),
+    partitionForShard: (shard) => ({ partitionValue: `KITCHEN#${providerId}#DAY#${day}#SHARD#${shard}` }),
+    scope, cursor, limit, index, keyForItem: orderCursorKey,
+  });
 }
 
-async function listOrdersByProvider(providerId, from, to) {
+async function listOrdersByProvider(providerId, from, to, { cursor, limit }) {
   if (!enabled) return null;
   await ensureOrdersTable();
-  return queryShards((partition) => queryAll({
-    tableName: ordersTable,
-    indexName: 'KitchenTimelineIndex',
-    partitionName: 'gsi2pk',
-    sortName: 'gsi2sk',
-    from: from ? `SERVICE_AT#${from}` : null,
-    to: to ? `SERVICE_AT#${to}` : null,
-    ...partition,
-  }), (shard) => ({ partitionValue: `KITCHEN#${providerId}#SHARD#${shard}` }));
+  const index = orderIndexes[1];
+  const scope = JSON.stringify(['orders-kitchen', providerId, from, to, limit]);
+  return queryShardsPage({
+    query: (partition) => queryPage({ tableName: ordersTable, indexName: index.name, partitionName: index.pk, sortName: index.sk, from: from ? `SERVICE_AT#${from}` : null, to: to ? `SERVICE_AT#${to}` : null, ...partition }),
+    partitionForShard: (shard) => ({ partitionValue: `KITCHEN#${providerId}#SHARD#${shard}` }),
+    scope, cursor, limit, index, keyForItem: orderCursorKey,
+  });
 }
 
-async function listOrdersByCustomer(customerId, from, to) {
+async function listOrdersByCustomer(customerId, from, to, { cursor, limit }) {
   if (!enabled) return null;
   await ensureOrdersTable();
-  return queryShards((partition) => queryAll({
-    tableName: ordersTable,
-    indexName: 'CustomerTimelineIndex',
-    partitionName: 'gsi3pk',
-    sortName: 'gsi3sk',
-    from: from ? `SERVICE_AT#${from}` : null,
-    to: to ? `SERVICE_AT#${to}` : null,
-    ...partition,
-  }), (shard) => ({ partitionValue: `CUSTOMER#${customerId}#SHARD#${shard}` }));
+  const index = orderIndexes[2];
+  const scope = JSON.stringify(['orders-customer', customerId, from, to, limit]);
+  return queryShardsPage({
+    query: (partition) => queryPage({ tableName: ordersTable, indexName: index.name, partitionName: index.pk, sortName: index.sk, from: from ? `SERVICE_AT#${from}` : null, to: to ? `SERVICE_AT#${to}` : null, ...partition }),
+    partitionForShard: (shard) => ({ partitionValue: `CUSTOMER#${customerId}#SHARD#${shard}` }),
+    scope, cursor, limit, index, keyForItem: orderCursorKey,
+  });
 }
 
-async function listOrders(from, to) {
+async function listOrders(from, to, { cursor, limit }) {
   if (!enabled) return null;
   await ensureOrdersTable();
-  return queryShards((partition) => queryAll({
-    tableName: ordersTable,
-    indexName: 'GlobalTimelineIndex',
-    partitionName: 'gsi4pk',
-    sortName: 'gsi4sk',
-    from: from ? `SERVICE_AT#${from}` : null,
-    to: to ? `SERVICE_AT#${to}` : null,
-    ...partition,
-  }), (shard) => ({ partitionValue: `ORDERS#SHARD#${shard}` }));
+  const index = orderIndexes[3];
+  const scope = JSON.stringify(['orders-global', from, to, limit]);
+  return queryShardsPage({
+    query: (partition) => queryPage({ tableName: ordersTable, indexName: index.name, partitionName: index.pk, sortName: index.sk, from: from ? `SERVICE_AT#${from}` : null, to: to ? `SERVICE_AT#${to}` : null, ...partition }),
+    partitionForShard: (shard) => ({ partitionValue: `ORDERS#SHARD#${shard}` }),
+    scope, cursor, limit, index, keyForItem: orderCursorKey,
+  });
 }
 
 async function updateOrderStatus(orderId, status) {
@@ -238,45 +256,51 @@ async function savePayment(payment) {
   await client.send(new PutCommand({ TableName: paymentsTable, Item: payment }));
 }
 
-async function listPaymentsByProvider(providerId, from, to) {
+async function listPaymentsByProvider(providerId, from, to, { cursor, limit }) {
   if (!enabled) return null;
   await ensurePaymentsTable();
-  return queryShards((partition) => queryAll({
-    tableName: paymentsTable,
-    indexName: 'KitchenTimelineIndex',
-    partitionName: 'gsi2pk',
-    sortName: 'gsi2sk',
-    from: from ? `SETTLED_AT#${from}` : null,
-    to: to ? `SETTLED_AT#${to}` : null,
-    ...partition,
-  }), (shard) => ({ partitionValue: `KITCHEN#${providerId}#SHARD#${shard}` }), 'settledAt');
-}
-
-async function listPaymentsByKitchenDate(providerId, day, from, to) {
-  if (!enabled) return null;
-  await ensurePaymentsTable();
-  const results = await Promise.all(Array.from({ length: SHARD_COUNT }, (_, shard) => queryAll({
-    tableName: paymentsTable,
-    indexName: 'KitchenDateIndex',
-    partitionName: 'gsi1pk',
-    sortName: 'gsi1sk',
-    partitionValue: `KITCHEN#${providerId}#DAY#${day}#SHARD#${shard}`,
-    from: from ? `SETTLED_AT#${from}` : null,
-    to: to ? `SETTLED_AT#${to}` : null,
-  })));
-  return results.flat().sort((left, right) => left.settledAt.localeCompare(right.settledAt));
-}
-
-async function listPaymentsByOrder(orderId) {
-  if (!enabled) return null;
-  await ensurePaymentsTable();
-  return queryAll({
-    tableName: paymentsTable,
-    indexName: 'OrderPaymentsIndex',
-    partitionName: 'gsi3pk',
-    partitionValue: `ORDER#${orderId}`,
-    sortName: 'gsi3sk',
+  const index = paymentIndexes[1];
+  const scope = JSON.stringify(['payments-kitchen', providerId, from, to, limit]);
+  return queryShardsPage({
+    query: (partition) => queryPage({ tableName: paymentsTable, indexName: index.name, partitionName: index.pk, sortName: index.sk, from: from ? `SETTLED_AT#${from}` : null, to: to ? `SETTLED_AT#${to}` : null, ...partition }),
+    partitionForShard: (shard) => ({ partitionValue: `KITCHEN#${providerId}#SHARD#${shard}` }),
+    scope, cursor, limit, index, keyForItem: paymentCursorKey, timestampField: 'settledAt',
   });
+}
+
+async function listPaymentsByKitchenDate(providerId, day, from, to, { cursor, limit }) {
+  if (!enabled) return null;
+  await ensurePaymentsTable();
+  const index = paymentIndexes[0];
+  const scope = JSON.stringify(['payments-kitchen-date', providerId, day, from, to, limit]);
+  return queryShardsPage({
+    query: (partition) => queryPage({ tableName: paymentsTable, indexName: index.name, partitionName: index.pk, sortName: index.sk, from: from ? `SETTLED_AT#${from}` : null, to: to ? `SETTLED_AT#${to}` : null, ...partition }),
+    partitionForShard: (shard) => ({ partitionValue: `KITCHEN#${providerId}#DAY#${day}#SHARD#${shard}` }),
+    scope, cursor, limit, index, keyForItem: paymentCursorKey, timestampField: 'settledAt',
+  });
+}
+
+async function listPaymentsByOrder(orderId, { cursor, limit }) {
+  if (!enabled) return null;
+  await ensurePaymentsTable();
+  const index = paymentIndexes[2];
+  const scope = JSON.stringify(['payments-order', orderId, limit]);
+  const state = decodeCursor(cursor, scope, 1);
+  const result = await queryPage({
+    tableName: paymentsTable,
+    indexName: index.name,
+    partitionName: index.pk,
+    partitionValue: `ORDER#${orderId}`,
+    sortName: index.sk,
+    cursorKey: state.positions[0],
+    limit,
+  });
+  const done = !result.lastEvaluatedKey;
+  return {
+    items: result.items,
+    hasMore: !done,
+    nextCursor: done ? null : encodeCursor(scope, { positions: [result.lastEvaluatedKey], done: [false] }),
+  };
 }
 
 module.exports = {

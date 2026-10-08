@@ -179,10 +179,12 @@ describe('Order service', () => {
     ]);
 
     await expect(paymentRepository.listByKitchenDate('p-001', '2026-10-08', '2026-10-08T00:00:00.000Z', '2026-10-08T23:59:59.999Z'))
-      .resolves.toHaveLength(1);
-    await expect(paymentRepository.listByOrder('o-1001')).resolves.toEqual([
-      expect.objectContaining({ paymentId: 'pay-1' })
-    ]);
+      .resolves.toMatchObject({ items: [expect.objectContaining({ paymentId: 'pay-1' })], hasMore: false, nextCursor: null });
+    await expect(paymentRepository.listByOrder('o-1001')).resolves.toMatchObject({
+      items: [expect.objectContaining({ paymentId: 'pay-1' })],
+      hasMore: false,
+      nextCursor: null,
+    });
   });
 
   it('rejects an invalid status transition', async () => {

@@ -23,6 +23,9 @@ export default function ProviderOrdersPage() {
   const { showNotification } = useContext(NotificationContext);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState(null);
   const [error, setError] = useState('');
   const [updatingOrderId, setUpdatingOrderId] = useState('');
   const [menuItems, setMenuItems] = useState([]);
@@ -45,6 +48,8 @@ export default function ProviderOrdersPage() {
     requests.then(([ordersResult, menuResult]) => {
         if (!active) return;
         setOrders(ordersResult.data || []);
+      setHasMore(Boolean(ordersResult.hasMore));
+      setNextCursor(ordersResult.nextCursor || null);
         setMenuItems(menuResult.data || []);
       })
       .catch((requestError) => {
@@ -55,6 +60,21 @@ export default function ProviderOrdersPage() {
       });
     return () => { active = false; };
   }, [activeRange, authLoading, user, token]);
+
+  const loadMoreOrders = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const result = await api.getOrders(token, { ...activeRange, cursor: nextCursor });
+      setOrders((current) => [...current, ...(result.data || [])]);
+      setHasMore(Boolean(result.hasMore));
+      setNextCursor(result.nextCursor || null);
+    } catch (requestError) {
+      showNotification(requestError.message || 'Could not load more orders', 'error');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const applyDateRange = (event) => {
     event.preventDefault();
@@ -150,6 +170,7 @@ export default function ProviderOrdersPage() {
                 </article>
               ))}
             </div> : <p>{orders.length ? 'No orders match your search.' : 'No orders yet.'}</p>}
+            {hasMore && <button type="button" className="btn btn-sm orders-load-more" onClick={loadMoreOrders} disabled={loadingMore}>{loadingMore ? 'Loading orders...' : 'Load more orders'}</button>}
           </>
         )
       ) : error ? <p role="alert">{error}</p> : (
@@ -162,13 +183,14 @@ export default function ProviderOrdersPage() {
         </form>
         <SearchField value={query} onChange={setQuery} placeholder="Search orders, schools, or status" label="Search orders" />
         <section className="provider-order-metrics" aria-label="Order performance">
-          <article><span>Gross sales</span><strong>{formatMWK(grossSales)}</strong></article>
-          <article><span>Orders</span><strong>{orders.length}</strong></article>
+          <article><span>Loaded gross sales</span><strong>{formatMWK(grossSales)}</strong></article>
+          <article><span>Loaded orders</span><strong>{orders.length}</strong></article>
           <article><span>Average order</span><strong>{formatMWK(grossSales / Math.max(validOrders.length, 1))}</strong></article>
           <article><span>Open orders</span><strong>{openOrders}</strong></article>
           <article><span>Completion rate</span><strong>{completionRate}%</strong></article>
           <article><span>Available menu items</span><strong>{menuItems.filter((item) => item.available !== false).length} / {menuItems.length}</strong></article>
         </section>
+        {hasMore && <p className="orders-loaded-note">Totals reflect loaded orders only. Load more to include additional orders in the selected range.</p>}
         {bestSellers.length > 0 && <section className="provider-top-dishes">
           <h2>Top ordered dishes</h2>
           <ol>{bestSellers.map(([name, quantity]) => <li key={name}><span>{name}</span><strong>{quantity} ordered</strong></li>)}</ol>
@@ -198,6 +220,7 @@ export default function ProviderOrdersPage() {
             </article>
           ))}
         </div> : <p>{orders.length ? 'No orders match your search.' : 'No incoming orders yet.'}</p>}
+        {hasMore && <button type="button" className="btn btn-sm orders-load-more" onClick={loadMoreOrders} disabled={loadingMore}>{loadingMore ? 'Loading orders...' : 'Load more orders'}</button>}
         </>
       )}
     </main></>

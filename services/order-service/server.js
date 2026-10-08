@@ -6,6 +6,17 @@ const { toIsoTimestamp } = require('./schema');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_REPORT_DAYS = 31;
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
+
+function parsePageSize(value) {
+  if (value === undefined) return DEFAULT_PAGE_SIZE;
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
+    throw new Error(`limit must be an integer from 1 to ${MAX_PAGE_SIZE}`);
+  }
+  return limit;
+}
 
 function parseDateRange(query) {
   if (query.date !== undefined) {
@@ -76,22 +87,31 @@ const createApp = () => {
 
   app.get('/api/orders', requireAuth(), async (req, res) => {
     let dateRange;
+    let page;
     try {
       dateRange = parseDateRange(req.query);
+      page = { cursor: req.query.cursor, limit: parsePageSize(req.query.limit) };
     } catch (error) {
       return res.status(400).json({ success: false, error: error.message });
     }
 
-    const filteredOrders = req.user.role === 'admin' || req.user.role === 'superadmin'
-      ? await orderRepository.list(dateRange.from, dateRange.to)
-      : req.user.role === 'provider' && req.user.providerId
+    let results;
+    try {
+      results = req.user.role === 'admin' || req.user.role === 'superadmin'
+        ? await orderRepository.list(dateRange.from, dateRange.to, page)
+        : req.user.role === 'provider' && req.user.providerId
       ? dateRange.date
-        ? await orderRepository.listByKitchenDate(req.user.providerId, dateRange.date, dateRange.from, dateRange.to)
-        : await orderRepository.listByProvider(req.user.providerId, dateRange.from, dateRange.to)
+        ? await orderRepository.listByKitchenDate(req.user.providerId, dateRange.date, dateRange.from, dateRange.to, page)
+        : await orderRepository.listByProvider(req.user.providerId, dateRange.from, dateRange.to, page)
       : req.user.role === 'customer'
-      ? await orderRepository.listByCustomer(req.user.userId, dateRange.from, dateRange.to)
+      ? await orderRepository.listByCustomer(req.user.userId, dateRange.from, dateRange.to, page)
       : [];
-    res.json({ success: true, data: filteredOrders });
+    } catch (error) {
+      if (error.message?.includes('cursor')) return res.status(400).json({ success: false, error: error.message });
+      throw error;
+    }
+    const pageResult = Array.isArray(results) ? { items: results, hasMore: false, nextCursor: null } : results;
+    res.json({ success: true, data: pageResult.items, hasMore: pageResult.hasMore, nextCursor: pageResult.nextCursor });
   });
 
   app.patch('/api/orders/:orderId/status', requireAuth('provider'), async (req, res) => {
@@ -116,16 +136,23 @@ const createApp = () => {
     }
 
     let dateRange;
+    let page;
     try {
       dateRange = parseDateRange(req.query);
+      page = { cursor: req.query.cursor, limit: parsePageSize(req.query.limit) };
     } catch (error) {
       return res.status(400).json({ success: false, error: error.message });
     }
 
-    const payments = dateRange.date
-      ? await paymentRepository.listByKitchenDate(req.user.providerId, dateRange.date, dateRange.from, dateRange.to)
-      : await paymentRepository.listByProvider(req.user.providerId, dateRange.from, dateRange.to);
-    return res.json({ success: true, data: payments });
+    try {
+      const payments = dateRange.date
+        ? await paymentRepository.listByKitchenDate(req.user.providerId, dateRange.date, dateRange.from, dateRange.to, page)
+        : await paymentRepository.listByProvider(req.user.providerId, dateRange.from, dateRange.to, page);
+      return res.json({ success: true, data: payments.items, hasMore: payments.hasMore, nextCursor: payments.nextCursor });
+    } catch (error) {
+      if (error.message?.includes('cursor')) return res.status(400).json({ success: false, error: error.message });
+      throw error;
+    }
   });
 
   app.get('/api/orders/:orderId/payments', requireAuth('provider'), async (req, res) => {
@@ -133,8 +160,15 @@ const createApp = () => {
     if (!order || order.providerId !== req.user.providerId) {
       return res.status(404).json({ success: false, error: 'Order not found' });
     }
-    const payments = await paymentRepository.listByOrder(order.id);
-    return res.json({ success: true, data: payments });
+    let page;
+    try {
+      page = { cursor: req.query.cursor, limit: parsePageSize(req.query.limit) };
+      const payments = await paymentRepository.listByOrder(order.id, page);
+      return res.json({ success: true, data: payments.items, hasMore: payments.hasMore, nextCursor: payments.nextCursor });
+    } catch (error) {
+      if (error.message?.includes('cursor') || error.message?.includes('limit')) return res.status(400).json({ success: false, error: error.message });
+      throw error;
+    }
   });
 
   app.post('/api/orders', requireAuth('customer'), async (req, res) => {

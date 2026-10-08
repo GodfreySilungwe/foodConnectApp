@@ -2,26 +2,37 @@ const dynamo = require('./dynamo');
 const { withOrderKeys, withPaymentKeys } = require('./schema');
 
 const inRange = (timestamp, from, to) => (!from || timestamp >= from) && (!to || timestamp <= to);
+const defaultPage = { cursor: undefined, limit: 25 };
+
+function pageItems(items, { cursor, limit }, sortField) {
+  const offset = cursor === undefined ? 0 : Number(Buffer.from(cursor, 'base64url').toString());
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('Invalid page cursor');
+  const ordered = [...items].sort((left, right) => left[sortField].localeCompare(right[sortField]));
+  const page = ordered.slice(offset, offset + limit);
+  const nextOffset = offset + page.length;
+  const hasMore = nextOffset < ordered.length;
+  return { items: page, hasMore, nextCursor: hasMore ? Buffer.from(String(nextOffset)).toString('base64url') : null };
+}
 
 class MemoryOrderRepository {
   constructor(seed = []) {
     this.orders = seed.map(withOrderKeys);
   }
 
-  async list(from, to) {
-    return this.orders.filter((order) => inRange(order.serviceAt, from, to));
+  async list(from, to, page = defaultPage) {
+    return pageItems(this.orders.filter((order) => inRange(order.serviceAt, from, to)), page, 'serviceAt');
   }
 
-  async listByCustomer(customerId, from, to) {
-    return this.orders.filter((order) => order.customerId === customerId && inRange(order.serviceAt, from, to));
+  async listByCustomer(customerId, from, to, page = defaultPage) {
+    return pageItems(this.orders.filter((order) => order.customerId === customerId && inRange(order.serviceAt, from, to)), page, 'serviceAt');
   }
 
-  async listByProvider(providerId, from, to) {
-    return this.orders.filter((order) => order.providerId === providerId && inRange(order.serviceAt, from, to));
+  async listByProvider(providerId, from, to, page = defaultPage) {
+    return pageItems(this.orders.filter((order) => order.providerId === providerId && inRange(order.serviceAt, from, to)), page, 'serviceAt');
   }
 
-  async listByKitchenDate(providerId, day, from, to) {
-    return this.orders.filter((order) => order.providerId === providerId && order.serviceAt.slice(0, 10) === day && inRange(order.serviceAt, from, to));
+  async listByKitchenDate(providerId, day, from, to, page = defaultPage) {
+    return pageItems(this.orders.filter((order) => order.providerId === providerId && order.serviceAt.slice(0, 10) === day && inRange(order.serviceAt, from, to)), page, 'serviceAt');
   }
 
   async findById(orderId) {
@@ -47,26 +58,21 @@ class DynamoOrderRepository {
     this.seed = seed;
   }
 
-  async list(from, to) {
-    const orders = await dynamo.listOrders(from, to);
-    if (orders.length === 0) {
-      const seededOrders = this.seed.map(withOrderKeys);
-      await Promise.all(seededOrders.map((order) => dynamo.saveOrder(order)));
-      return seededOrders;
-    }
-    return orders;
+  async list(from, to, page = defaultPage) {
+    const result = await dynamo.listOrders(from, to, page);
+    return result;
   }
 
-  async listByCustomer(customerId, from, to) {
-    return dynamo.listOrdersByCustomer(customerId, from, to);
+  async listByCustomer(customerId, from, to, page = defaultPage) {
+    return dynamo.listOrdersByCustomer(customerId, from, to, page);
   }
 
-  async listByProvider(providerId, from, to) {
-    return dynamo.listOrdersByProvider(providerId, from, to);
+  async listByProvider(providerId, from, to, page = defaultPage) {
+    return dynamo.listOrdersByProvider(providerId, from, to, page);
   }
 
-  async listByKitchenDate(providerId, day, from, to) {
-    return dynamo.listOrdersByKitchenDate(providerId, day, from, to);
+  async listByKitchenDate(providerId, day, from, to, page = defaultPage) {
+    return dynamo.listOrdersByKitchenDate(providerId, day, from, to, page);
   }
 
   async findById(orderId) {
@@ -89,16 +95,16 @@ class MemoryPaymentRepository {
     this.payments = seed.map(withPaymentKeys);
   }
 
-  async listByProvider(providerId, from, to) {
-    return this.payments.filter((payment) => payment.providerId === providerId && inRange(payment.settledAt, from, to));
+  async listByProvider(providerId, from, to, page = defaultPage) {
+    return pageItems(this.payments.filter((payment) => payment.providerId === providerId && inRange(payment.settledAt, from, to)), page, 'settledAt');
   }
 
-  async listByKitchenDate(providerId, day, from, to) {
-    return this.payments.filter((payment) => payment.providerId === providerId && payment.settledAt.slice(0, 10) === day && inRange(payment.settledAt, from, to));
+  async listByKitchenDate(providerId, day, from, to, page = defaultPage) {
+    return pageItems(this.payments.filter((payment) => payment.providerId === providerId && payment.settledAt.slice(0, 10) === day && inRange(payment.settledAt, from, to)), page, 'settledAt');
   }
 
-  async listByOrder(orderId) {
-    return this.payments.filter((payment) => payment.orderId === orderId);
+  async listByOrder(orderId, page = defaultPage) {
+    return pageItems(this.payments.filter((payment) => payment.orderId === orderId), page, 'settledAt');
   }
 
   async save(payment) {
@@ -109,16 +115,16 @@ class MemoryPaymentRepository {
 }
 
 class DynamoPaymentRepository {
-  async listByProvider(providerId, from, to) {
-    return dynamo.listPaymentsByProvider(providerId, from, to);
+  async listByProvider(providerId, from, to, page = defaultPage) {
+    return dynamo.listPaymentsByProvider(providerId, from, to, page);
   }
 
-  async listByKitchenDate(providerId, day, from, to) {
-    return dynamo.listPaymentsByKitchenDate(providerId, day, from, to);
+  async listByKitchenDate(providerId, day, from, to, page = defaultPage) {
+    return dynamo.listPaymentsByKitchenDate(providerId, day, from, to, page);
   }
 
-  async listByOrder(orderId) {
-    return dynamo.listPaymentsByOrder(orderId);
+  async listByOrder(orderId, page = defaultPage) {
+    return dynamo.listPaymentsByOrder(orderId, page);
   }
 
   async save(payment) {

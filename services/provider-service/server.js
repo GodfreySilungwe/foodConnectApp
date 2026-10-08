@@ -71,14 +71,17 @@ const createApp = () => {
 
   const updateSchoolProviderCounts = async (schoolIds) => {
     await Promise.all([...new Set(schoolIds)].map(async (schoolId) => {
-      const [school, providers] = await Promise.all([
+      const [school, providerLinks] = await Promise.all([
         schoolRepository.findById(schoolId),
         providerRepository.listBySchool(schoolId),
       ]);
       if (!school) return;
+      const providers = await Promise.all(providerLinks.map((link) =>
+        providerRepository.findById(link.providerId || link.id)
+      ));
       await schoolRepository.save({
         ...school,
-        providerCount: providers.filter(isActiveRecord).length,
+        providerCount: providers.filter((provider) => provider && isActiveRecord(provider)).length,
       });
     }));
   };
@@ -167,8 +170,8 @@ const createApp = () => {
   app.get('/api/providers/:providerId/menu', async (req, res) => {
     const provider = await providerRepository.findById(req.params.providerId);
     if (!provider || !isActiveRecord(provider)) return res.status(404).json({ success: false, error: 'Provider not found' });
-    const [items, providers] = await Promise.all([menuRepository.listByProvider(req.params.providerId), providerRepository.list()]);
-    const availableItems = await addSchoolAvailability(items, providers);
+    const items = await menuRepository.listByProvider(req.params.providerId);
+    const availableItems = await addSchoolAvailability(items, [provider]);
     return res.json({ success: true, data: availableItems });
   });
 
