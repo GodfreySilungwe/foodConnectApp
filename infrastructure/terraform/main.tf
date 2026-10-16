@@ -196,7 +196,7 @@ resource "aws_iam_role" "ecs_task_role" {
   })
 }
 
-resource "aws_application_load_balancer" "main" {
+resource "aws_lb" "main" {
   name               = "${var.project_name}-${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -225,7 +225,7 @@ resource "aws_lb_target_group" "main" {
 }
 
 resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_application_load_balancer.main.arn
+  load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
 
@@ -682,7 +682,7 @@ data "aws_availability_zones" "available" {
 }
 
 output "alb_dns_name" {
-  value = aws_application_load_balancer.main.dns_name
+  value = aws_lb.main.dns_name
 }
 
 output "ecr_repository_url" {
