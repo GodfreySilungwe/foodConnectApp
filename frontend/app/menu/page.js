@@ -12,11 +12,13 @@ export default function MenuPage() {
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api.getFeaturedMenu()
       .then((result) => setItems(result.data || []))
-      .catch((requestError) => setError(requestError.message));
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const filteredItems = items.filter((item) => matchesSearch(
@@ -32,7 +34,7 @@ export default function MenuPage() {
       <Link href="/" className="page-back">Back to home</Link>
       <div className="page-heading"><p className="eyebrow">Explore FoodConnect</p><h1>Featured menu</h1><p>Fresh choices from trusted local providers.</p></div>
       <SearchField value={query} onChange={setQuery} placeholder="Search dishes, providers, or schools" label="Search menu" />
-      {error ? <p>{error}</p> : filteredItems.length ? <MenuGrid items={filteredItems} showProvider /> : <p>No dishes match your search.</p>}
+      {loading ? <p className="data-loading" role="status"><span className="data-loading-spinner" aria-hidden="true" />Loading menu items...</p> : error ? <p role="alert">{error}</p> : filteredItems.length ? <MenuGrid items={filteredItems} showProvider /> : <p>No dishes match your search.</p>}
     </main></>
   );
 }

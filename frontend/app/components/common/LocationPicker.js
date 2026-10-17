@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCurrentCoordinates } from '@/utils/location';
 import 'leaflet/dist/leaflet.css';
 import '@/styles/components/LocationPicker.css';
@@ -13,6 +13,8 @@ export default function LocationPicker({ value, onChange, label = 'Choose a loca
   const markerRef = useRef(null);
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const coordinatesSelected = Number.isFinite(value?.latitude) && Number.isFinite(value?.longitude);
 
   useEffect(() => {
@@ -29,9 +31,12 @@ export default function LocationPicker({ value, onChange, label = 'Choose a loca
     getCurrentCoordinates().then((coordinates) => {
       const currentValue = valueRef.current;
       if (active && !(Number.isFinite(currentValue?.latitude) && Number.isFinite(currentValue?.longitude))) {
+        setLocationError('');
         onChangeRef.current(coordinates);
       }
-    }).catch(() => {});
+    }).catch((error) => {
+      if (active) setLocationError(error.message);
+    });
     return () => { active = false; };
   }, [autoLocate, coordinatesSelected]);
 
@@ -95,17 +100,29 @@ export default function LocationPicker({ value, onChange, label = 'Choose a loca
     }
   }, [coordinatesSelected, value?.latitude, value?.longitude]);
 
-  const useCurrentLocation = () => {
-    getCurrentCoordinates().then(onChange).catch(() => {});
+  const useCurrentLocation = async () => {
+    setLocating(true);
+    setLocationError('');
+    try {
+      const coordinates = await getCurrentCoordinates();
+      onChangeRef.current(coordinates);
+    } catch (error) {
+      setLocationError(error.message);
+    } finally {
+      setLocating(false);
+    }
   };
 
   return (
     <div className="location-picker">
       <div className="location-picker-heading">
         <strong>{label}</strong>
-        <button type="button" onClick={useCurrentLocation}>Use current location</button>
+        <button type="button" onClick={useCurrentLocation} disabled={locating}>
+          {locating ? 'Finding location...' : 'Use current location'}
+        </button>
       </div>
       <div ref={containerRef} className="location-picker-map" role="application" aria-label={`${label} map`} />
+      {locationError && <p className="location-picker-error" role="alert">{locationError}</p>}
       <p className="location-picker-coordinates">
         {coordinatesSelected
           ? `Selected: ${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}`

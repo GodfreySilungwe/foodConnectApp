@@ -18,6 +18,7 @@ export default function ProviderDetailsPage() {
   const [schools, setSchools] = useState([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [selectedRating, setSelectedRating] = useState(0);
   const [submittingRating, setSubmittingRating] = useState(false);
 
@@ -31,6 +32,8 @@ export default function ProviderDetailsPage() {
       setSchools((schoolsResult.data || []).filter((school) => schoolIds.includes(school.id)));
     } catch (requestError) {
       setError(requestError.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -68,7 +71,7 @@ export default function ProviderDetailsPage() {
   return (
     <><AppHeader /><main className="container page-content">
       <Link href="/providers" className="page-back">Back to providers</Link>
-      {error && <p>{error}</p>}
+      {loading ? <p className="data-loading" role="status"><span className="data-loading-spinner" aria-hidden="true" />Loading provider, menu items, and schools...</p> : error && <p role="alert">{error}</p>}
       {provider && <>
         <div className="page-heading"><p className="eyebrow">Provider profile</p><h1>{provider.name}</h1><p>{provider.ownerName} · {provider.status}</p>{provider.phone && <p>Phone: <a href={`tel:${provider.phone}`}>{provider.phone}</a></p>}</div>
         {provider.description && <p>{provider.description}</p>}

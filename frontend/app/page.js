@@ -97,7 +97,7 @@ export default function HomePage() {
     return (
       <div className="loading-screen">
         <div className="loading-spinner" />
-        <p>Loading FoodConnect...</p>
+        <p role="status">Loading menu items, providers, and schools...</p>
       </div>
     );
   }
@@ -147,25 +147,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Schools Section */}
-      <section className="section section-alt">
-        <div className="container">
-          <SearchField value={query} onChange={setQuery} placeholder="Search schools, dishes, or providers" label="Search schools, dishes, and providers" />
-          <div className="section-header">
-            <div>
-              <h2>Registered Schools</h2>
-              <p className="section-subtitle">
-                Schools offering food services
-              </p>
-            </div>
-            <Link href="/schools" className="btn btn-ghost">All Schools →</Link>
-          </div>
-          {visibleSchools.length ? <div className="school-grid">
-            {visibleSchools.map((school) => <SchoolCard key={school.id} school={school} />)}
-          </div> : query && <p className="home-search-empty">No schools match your search.</p>}
-        </div>
-      </section>
-
       {/* Featured Menu */}
       <section className="section">
         <div className="container">
@@ -200,6 +181,25 @@ export default function HomePage() {
             {visibleProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}
           </div>
           {query && !visibleProviders.length && <p className="home-search-empty">No providers match your search.</p>}
+        </div>
+      </section>
+
+      {/* Schools Section */}
+      <section className="section section-alt">
+        <div className="container">
+          <SearchField value={query} onChange={setQuery} placeholder="Search schools, dishes, or providers" label="Search schools, dishes, and providers" />
+          <div className="section-header">
+            <div>
+              <h2>Registered Schools</h2>
+              <p className="section-subtitle">
+                Schools offering food services
+              </p>
+            </div>
+            <Link href="/schools" className="btn btn-ghost">All Schools →</Link>
+          </div>
+          {visibleSchools.length ? <div className="school-grid">
+            {visibleSchools.map((school) => <SchoolCard key={school.id} school={school} />)}
+          </div> : query && <p className="home-search-empty">No schools match your search.</p>}
         </div>
       </section>
 

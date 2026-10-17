@@ -21,10 +21,14 @@ const paymentsTable = process.env.PAYMENTS_TABLE || 'foodconnect-dev-payments-v2
 const rawClient = new DynamoDBClient({
   endpoint: process.env.DYNAMODB_ENDPOINT || undefined,
   region: process.env.AWS_REGION || 'ap-southeast-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'fakeMyKeyId',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'fakeSecretAccessKey',
-  },
+  ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    ? {
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        },
+      }
+    : {}),
   maxAttempts: 3,
 });
 const client = DynamoDBDocumentClient.from(rawClient);

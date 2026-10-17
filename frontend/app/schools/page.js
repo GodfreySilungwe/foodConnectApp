@@ -14,11 +14,21 @@ export default function SchoolsPage() {
   const [schools, setSchools] = useState([]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     api.getSchools()
-      .then((result) => setSchools(result.data || []))
-      .catch((requestError) => setError(requestError.message));
+      .then((result) => {
+        if (active) setSchools(result.data || []);
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
   }, []);
 
   const filteredSchools = schools.filter((school) => matchesSearch(query, school.name, school.location));
@@ -28,7 +38,7 @@ export default function SchoolsPage() {
       <Link href="/" className="page-back">Back to home</Link>
       <div className="page-heading"><p className="eyebrow">Community network</p><h1>Registered schools</h1><p>Places where local food services are available to students and staff.</p>{['provider', 'school', 'admin'].includes(user?.role) && <Link href="/schools/register" className="btn btn-primary btn-sm">Register a school</Link>}</div>
       <SearchField value={query} onChange={setQuery} placeholder="Search schools by name or location" label="Search schools" />
-      {error ? <p>{error}</p> : filteredSchools.length ? <div className="school-grid">{filteredSchools.map((school) => <SchoolCard key={school.id} school={school} />)}</div> : <p>No schools match your search.</p>}
+      {loading ? <p className="data-loading" role="status"><span className="data-loading-spinner" aria-hidden="true" />Loading registered schools...</p> : error ? <p role="alert">{error}</p> : filteredSchools.length ? <div className="school-grid">{filteredSchools.map((school) => <SchoolCard key={school.id} school={school} />)}</div> : <p>No schools match your search.</p>}
     </main></>
   );
 }

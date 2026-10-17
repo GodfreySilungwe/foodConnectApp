@@ -30,6 +30,18 @@ export default function AppHeader() {
           <span aria-hidden="true">☰</span><span>Menu</span>
         </button>
         <nav id="primary-navigation" className={`header-nav${mobileMenuOpen ? ' open' : ''}`} aria-label="Main navigation">
+          <div className="header-nav-heading">
+            <span className="header-nav-title">Navigation</span>
+            <button
+              type="button"
+              className="header-nav-close"
+              aria-label="Close navigation menu"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
+          <Link href="/" className={linkClassName('/')} onClick={() => setMobileMenuOpen(false)}>Home</Link>
           {user?.role !== 'provider' && <Link href="/menu" className={linkClassName('/menu')} onClick={() => setMobileMenuOpen(false)}>Menu</Link>}
           <Link href="/schools" className={linkClassName('/schools')} onClick={() => setMobileMenuOpen(false)}>{user?.role === 'provider' ? 'All Schools' : 'Schools'}</Link>
           {user?.role !== 'provider' && <Link href="/providers" className={linkClassName('/providers')} onClick={() => setMobileMenuOpen(false)}>Providers</Link>}
