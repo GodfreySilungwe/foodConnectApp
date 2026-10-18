@@ -150,6 +150,7 @@ export default function HomePage() {
       {/* Featured Menu */}
       <section className="section">
         <div className="container">
+          <SearchField value={query} onChange={setQuery} placeholder="Search dishes, providers, or schools" label="Search dishes, providers, and schools" />
           <div className="section-header">
             <div>
               <h2>Popular Dishes</h2>
@@ -187,7 +188,6 @@ export default function HomePage() {
       {/* Schools Section */}
       <section className="section section-alt">
         <div className="container">
-          <SearchField value={query} onChange={setQuery} placeholder="Search schools, dishes, or providers" label="Search schools, dishes, and providers" />
           <div className="section-header">
             <div>
               <h2>Registered Schools</h2>
