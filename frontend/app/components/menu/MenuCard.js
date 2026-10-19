@@ -54,14 +54,21 @@ export default function MenuCard({ item, showProvider = false, providerControls 
     if (!showAllImages) return undefined;
 
     const previousOverflow = document.body.style.overflow;
+    const previousPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') setShowAllImages(false);
     };
 
     document.body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      const currentPadding = Number.parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
+      document.body.style.paddingRight = `${currentPadding + scrollbarWidth}px`;
+    }
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.body.style.paddingRight = previousPaddingRight;
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [showAllImages]);
