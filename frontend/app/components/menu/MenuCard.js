@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
@@ -32,6 +32,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
   const [quantity, setQuantity] = useState(1);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showAllImages, setShowAllImages] = useState(false);
+  const touchStartX = useRef(null);
   const [isOrdering, setIsOrdering] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
@@ -49,6 +50,22 @@ export default function MenuCard({ item, showProvider = false, providerControls 
   const [isLoadingSchools, setIsLoadingSchools] = useState(false);
   const images = item.images?.length ? item.images : item.image ? [item.image] : [];
 
+  useEffect(() => {
+    if (!showAllImages) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setShowAllImages(false);
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAllImages]);
+
   const expandCardImages = (event) => {
     if (!images.length || event.target.closest('a, button, input, label, select, textarea')) return;
     setShowAllImages(true);
@@ -58,6 +75,17 @@ export default function MenuCard({ item, showProvider = false, providerControls 
     if (event.target !== event.currentTarget || !['Enter', ' '].includes(event.key)) return;
     event.preventDefault();
     setShowAllImages(true);
+  };
+
+  const showPreviousImage = () => setActiveImageIndex((index) => (index + images.length - 1) % images.length);
+  const showNextImage = () => setActiveImageIndex((index) => (index + 1) % images.length);
+
+  const handleGalleryTouchEnd = (event) => {
+    if (touchStartX.current === null) return;
+    const distance = event.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(distance) < 45 || images.length < 2) return;
+    setActiveImageIndex((index) => (index + (distance < 0 ? 1 : images.length - 1)) % images.length);
   };
 
   const openCheckout = async () => {
@@ -256,24 +284,9 @@ export default function MenuCard({ item, showProvider = false, providerControls 
           <p className="menu-card-description">{item.description}</p>
         )}
         {images.length > 0 && <>
-          <button type="button" className="menu-card-gallery-toggle" onClick={() => setShowAllImages((current) => !current)} aria-expanded={showAllImages}>
-            {showAllImages ? 'Hide photos' : `Expand ${images.length === 1 ? 'photo' : `${images.length} photos`}`}
+          <button type="button" className="menu-card-gallery-toggle" onClick={() => setShowAllImages(true)}>
+            View {images.length === 1 ? 'photo and details' : `${images.length} photos and details`}
           </button>
-          {showAllImages && <div className="menu-card-expanded-gallery">
-            <div className="menu-card-gallery-stage">
-              <img className="menu-card-expanded-photo" src={getProviderImageUrl(images[Math.min(activeImageIndex, images.length - 1)])} alt={`${item.name}, photo ${activeImageIndex + 1}`} />
-              {images.length > 1 && <>
-                <button type="button" className="menu-card-gallery-previous" onClick={() => setActiveImageIndex((activeImageIndex + images.length - 1) % images.length)} aria-label="Previous photo">‹</button>
-                <span className="menu-card-gallery-count">{activeImageIndex + 1} / {images.length}</span>
-                <button type="button" className="menu-card-gallery-next" onClick={() => setActiveImageIndex((activeImageIndex + 1) % images.length)} aria-label="Next photo">›</button>
-              </>}
-            </div>
-            {images.length > 1 && <div className="menu-card-image-gallery">
-              {images.map((image, index) => <button type="button" key={`${item.id}-image-${index}`} onClick={() => setActiveImageIndex(index)} aria-label={`Show photo ${index + 1}`} aria-pressed={activeImageIndex === index}>
-                <img src={getProviderImageUrl(image)} alt={`${item.name}, photo ${index + 1}`} />
-              </button>)}
-            </div>}
-          </div>}
         </>}
         {Array.isArray(item.availableSchools) && (
           <p className="menu-card-description">Available at: {item.availableSchools.length ? item.availableSchools.map((school, index) => <span key={school.id}>{index > 0 && ', '}<strong>{school.name}</strong>{school.distanceKm !== null && school.distanceKm !== undefined ? ` · ${school.distanceKm} km · approx. ${school.estimatedMinutes} min delivery` : ''}</span>) : 'No registered schools'}</p>
@@ -308,6 +321,77 @@ export default function MenuCard({ item, showProvider = false, providerControls 
         </div>}
       </div>
     </article>
+    {showAllImages && createPortal(
+      <div className="menu-expanded-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setShowAllImages(false)}>
+        <section className="menu-expanded-dialog" role="dialog" aria-modal="true" aria-labelledby={`menu-expanded-title-${item.id}`}>
+          <header className="menu-expanded-header">
+            <button type="button" className="menu-expanded-back" onClick={() => setShowAllImages(false)}>
+              <span aria-hidden="true">←</span> Back to menu
+            </button>
+            <Link href="/" className="menu-expanded-home" onClick={() => setShowAllImages(false)}>Home</Link>
+            <button type="button" className="menu-expanded-close" onClick={() => setShowAllImages(false)} aria-label="Close expanded menu item">×</button>
+          </header>
+          <div className="menu-expanded-content">
+            <div className="menu-expanded-gallery">
+              <div
+                className="menu-card-gallery-stage"
+                onTouchStart={(event) => { touchStartX.current = event.touches[0].clientX; }}
+                onTouchEnd={handleGalleryTouchEnd}
+              >
+                <img className="menu-card-expanded-photo" src={getProviderImageUrl(images[Math.min(activeImageIndex, images.length - 1)])} alt={`${item.name}, photo ${activeImageIndex + 1}`} />
+                {images.length > 1 && <>
+                  <button type="button" className="menu-card-gallery-previous" onClick={showPreviousImage} aria-label="Previous photo">‹</button>
+                  <span className="menu-card-gallery-count">{activeImageIndex + 1} / {images.length}</span>
+                  <button type="button" className="menu-card-gallery-next" onClick={showNextImage} aria-label="Next photo">›</button>
+                </>}
+              </div>
+              {images.length > 1 && <div className="menu-card-image-gallery">
+                {images.map((image, index) => <button type="button" key={`${item.id}-image-${index}`} onClick={() => setActiveImageIndex(index)} aria-label={`Show photo ${index + 1}`} aria-pressed={activeImageIndex === index}>
+                  <img src={getProviderImageUrl(image)} alt={`${item.name}, photo ${index + 1}`} />
+                </button>)}
+              </div>}
+            </div>
+            <div className="menu-expanded-details">
+              <p className="menu-expanded-eyebrow">{item.available === false ? 'Currently unavailable' : 'Freshly prepared'}</p>
+              <h2 id={`menu-expanded-title-${item.id}`}>{item.name}</h2>
+              <p className="menu-expanded-price">{formatMWK(item.price)}</p>
+              {showProvider && item.providerName && (
+                <Link href={`/providers/${item.providerId}`} className="menu-card-provider" onClick={() => setShowAllImages(false)}>
+                  🏪 {item.providerName} <span aria-hidden="true">→</span>
+                </Link>
+              )}
+              {item.description && <p className="menu-expanded-description">{item.description}</p>}
+              {Array.isArray(item.availableSchools) && (
+                <section className="menu-expanded-availability">
+                  <h3>Available at</h3>
+                  {item.availableSchools.length ? (
+                    <ul>{item.availableSchools.map((school) => (
+                      <li key={school.id}>
+                        <span>{school.name}</span>
+                        {school.distanceKm !== null && school.distanceKm !== undefined && (
+                          <small>{school.distanceKm} km · approx. {school.estimatedMinutes} min delivery</small>
+                        )}
+                      </li>
+                    ))}</ul>
+                  ) : <p>No registered schools are available for this item.</p>}
+                </section>
+              )}
+              {!providerControls && <div className="menu-expanded-order">
+                <div className="menu-card-quantity" aria-label="Quantity">
+                  <button type="button" onClick={() => setQuantity((current) => Math.max(1, current - 1))} disabled={quantity <= 1} aria-label="Decrease quantity">−</button>
+                  <span>{quantity}</span>
+                  <button type="button" onClick={() => setQuantity((current) => current + 1)} aria-label="Increase quantity">+</button>
+                </div>
+                <button type="button" className="btn btn-primary" onClick={openCheckout} disabled={isOrdering || item.available === false}>
+                  {isOrdering ? 'Loading...' : 'Order for student'}
+                </button>
+              </div>}
+            </div>
+          </div>
+        </section>
+      </div>,
+      document.body
+    )}
     {showCheckout && createPortal(
         <div className="checkout-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setShowCheckout(false)}>
           <form className="checkout-dialog" role="dialog" aria-modal="true" aria-labelledby={`checkout-title-${item.id}`} onSubmit={showSignup ? handleSignupAndOrder : showSignin ? handleSigninAndOrder : handleOrder}>

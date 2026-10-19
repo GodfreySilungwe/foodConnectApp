@@ -122,7 +122,7 @@ async function queryPage({ tableName, indexName, partitionName, partitionValue, 
     KeyConditionExpression: keyCondition,
     ExpressionAttributeNames: names,
     ExpressionAttributeValues: values,
-    ExclusiveStartKey: cursorKey,
+    ...(cursorKey ? { ExclusiveStartKey: cursorKey } : {}),
     Limit: limit,
     ScanIndexForward: true,
   }));
