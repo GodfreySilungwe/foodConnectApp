@@ -335,7 +335,6 @@ export default function MenuCard({ item, showProvider = false, providerControls 
             <button type="button" className="menu-expanded-back" onClick={() => setShowAllImages(false)}>
               <span aria-hidden="true">←</span> Back to menu
             </button>
-            <Link href="/" className="menu-expanded-home" onClick={() => setShowAllImages(false)}>Home</Link>
             <button type="button" className="menu-expanded-close" onClick={() => setShowAllImages(false)} aria-label="Close expanded menu item">×</button>
           </header>
           <div className="menu-expanded-content">

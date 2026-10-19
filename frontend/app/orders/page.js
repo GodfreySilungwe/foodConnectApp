@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
@@ -18,6 +18,13 @@ const nextStatuses = {
   ready: ['completed'],
 };
 
+const formatOrderedAt = (timestamp) => {
+  if (!timestamp) return 'Date unavailable';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+};
+
 export default function ProviderOrdersPage() {
   const { user, token, loading: authLoading } = useContext(AuthContext);
   const { showNotification } = useContext(NotificationContext);
@@ -29,10 +36,35 @@ export default function ProviderOrdersPage() {
   const [error, setError] = useState('');
   const [updatingOrderId, setUpdatingOrderId] = useState('');
   const [menuItems, setMenuItems] = useState([]);
+  const [menuNames, setMenuNames] = useState({});
   const [query, setQuery] = useState('');
   const [rangeStartInput, setRangeStartInput] = useState('');
   const [rangeEndInput, setRangeEndInput] = useState('');
   const [activeRange, setActiveRange] = useState({});
+
+  const resolveMenuNames = useCallback(async (ordersToResolve) => {
+    const providerIds = [...new Set(ordersToResolve
+      .filter((order) => order.items?.some((item) => !item.name && item.menuId))
+      .map((order) => order.providerId)
+      .filter(Boolean))];
+    const results = await Promise.allSettled(providerIds.map(async (providerId) => ({
+      providerId,
+      result: await api.getMenu(providerId),
+    })));
+
+    return results.reduce((names, result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`Failed to load menu names for provider ${providerIds[index]}:`, result.reason);
+        return names;
+      }
+      const { providerId, result: menuResult } = result.value;
+      for (const item of menuResult.data || []) {
+        if (item.id) names[`${providerId}:${item.id}`] = item.name;
+        if (item.menuId) names[`${providerId}:${item.menuId}`] = item.name;
+      }
+      return names;
+    }, {});
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -42,31 +74,40 @@ export default function ProviderOrdersPage() {
     }
 
     let active = true;
-    const requests = user.role === 'provider'
-      ? Promise.all([api.getOrders(token, activeRange), api.getMyMenu(token)])
-      : api.getOrders(token, activeRange).then((ordersResult) => [ordersResult, { data: [] }]);
-    requests.then(([ordersResult, menuResult]) => {
-        if (!active) return;
-        setOrders(ordersResult.data || []);
+    setLoading(true);
+    setError('');
+    const loadOrders = async () => {
+      const [ordersResult, menuResult] = user.role === 'provider'
+        ? await Promise.all([api.getOrders(token, activeRange), api.getMyMenu(token)])
+        : [await api.getOrders(token, activeRange), { data: [] }];
+      const nextOrders = ordersResult.data || [];
+      const nextMenuNames = user.role === 'customer' ? await resolveMenuNames(nextOrders) : {};
+      if (!active) return;
+      setOrders(nextOrders);
+      setMenuNames((current) => ({ ...current, ...nextMenuNames }));
       setHasMore(Boolean(ordersResult.hasMore));
       setNextCursor(ordersResult.nextCursor || null);
-        setMenuItems(menuResult.data || []);
-      })
+      setMenuItems(menuResult.data || []);
+    };
+    loadOrders()
       .catch((requestError) => {
-        if (active) setError(requestError.message || 'Could not load provider orders');
+        if (active) setError(requestError.message || 'Could not load orders');
       })
       .finally(() => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [activeRange, authLoading, user, token]);
+  }, [activeRange, authLoading, user, token, resolveMenuNames]);
 
   const loadMoreOrders = async () => {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
       const result = await api.getOrders(token, { ...activeRange, cursor: nextCursor });
-      setOrders((current) => [...current, ...(result.data || [])]);
+      const moreOrders = result.data || [];
+      const nextMenuNames = user?.role === 'customer' ? await resolveMenuNames(moreOrders) : {};
+      setOrders((current) => [...current, ...moreOrders]);
+      setMenuNames((current) => ({ ...current, ...nextMenuNames }));
       setHasMore(Boolean(result.hasMore));
       setNextCursor(result.nextCursor || null);
     } catch (requestError) {
@@ -128,13 +169,14 @@ export default function ProviderOrdersPage() {
   }, new Map());
   const bestSellers = [...topDishes.entries()].sort((left, right) => right[1] - left[1]).slice(0, 3);
   const isProvider = user?.role === 'provider';
+  const mealName = (order, item) => item.name || menuNames[`${order.providerId}:${item.menuId}`] || 'Meal name unavailable';
   const visibleOrders = orders.filter((order) => matchesSearch(
     query,
     order.id,
     order.status,
     order.studentName,
     order.schoolName,
-    order.items?.map((item) => item.name || item.menuId).join(' ')
+    order.items?.map((item) => mealName(order, item)).join(' ')
   ));
 
   return (
@@ -155,7 +197,8 @@ export default function ProviderOrdersPage() {
                   <dl className="provider-order-details">
                     <div><dt>Student</dt><dd>{order.studentName || 'Details unavailable'}{order.studentClass ? ` · ${order.studentClass}` : ''}</dd></div>
                     <div><dt>School</dt><dd>{order.schoolName || order.schoolId || 'Not specified'}</dd></div>
-                    <div><dt>Items</dt><dd>{order.items?.length ? order.items.map((item) => `${item.quantity} × ${item.name || item.menuId}`).join(', ') : 'Order details unavailable'}</dd></div>
+                    <div><dt>Items</dt><dd>{order.items?.length ? order.items.map((item) => `${item.quantity} × ${mealName(order, item)}`).join(', ') : 'Order details unavailable'}</dd></div>
+                    <div><dt>Ordered</dt><dd><time dateTime={order.createdAt || undefined}>{formatOrderedAt(order.createdAt)}</time></dd></div>
                     <div><dt>Total</dt><dd>{formatMWK(order.total)}</dd></div>
                     <div><dt>Delivery</dt><dd>{order.deliveryType || 'collection'}</dd></div>
                     {order.foodPreferences && <div><dt>Preferences</dt><dd>{order.foodPreferences}</dd></div>}

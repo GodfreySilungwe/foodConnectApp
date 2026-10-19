@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AuthContext } from '@/contexts/AuthContext';
 import '@/styles/components/Header.css';
@@ -10,7 +10,33 @@ export default function AppHeader() {
   const { user, logout } = useContext(AuthContext);
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navRef = useRef(null);
+  const toggleRef = useRef(null);
   const linkClassName = (href) => `header-nav-link${pathname === href || pathname.startsWith(`${href}/`) ? ' active' : ''}`;
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+
+    const closeOnOutsideInteraction = (event) => {
+      if (!navRef.current?.contains(event.target) && !toggleRef.current?.contains(event.target)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsideInteraction);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideInteraction);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <header className="header">
@@ -22,6 +48,7 @@ export default function AppHeader() {
         <button
           type="button"
           className="header-mobile-toggle"
+          ref={toggleRef}
           aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
           aria-expanded={mobileMenuOpen}
           aria-controls="primary-navigation"
@@ -29,18 +56,7 @@ export default function AppHeader() {
         >
           <span aria-hidden="true">☰</span><span>Menu</span>
         </button>
-        <nav id="primary-navigation" className={`header-nav${mobileMenuOpen ? ' open' : ''}`} aria-label="Main navigation">
-          <div className="header-nav-heading">
-            <span className="header-nav-title">Navigation</span>
-            <button
-              type="button"
-              className="header-nav-close"
-              aria-label="Close navigation menu"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <span aria-hidden="true">×</span>
-            </button>
-          </div>
+        <nav id="primary-navigation" ref={navRef} className={`header-nav${mobileMenuOpen ? ' open' : ''}`} aria-label="Main navigation">
           <Link href="/" className={linkClassName('/')} onClick={() => setMobileMenuOpen(false)}>Home</Link>
           {user?.role !== 'provider' && <Link href="/menu" className={linkClassName('/menu')} onClick={() => setMobileMenuOpen(false)}>Menu</Link>}
           <Link href="/schools" className={linkClassName('/schools')} onClick={() => setMobileMenuOpen(false)}>{user?.role === 'provider' ? 'All Schools' : 'Schools'}</Link>
@@ -50,13 +66,15 @@ export default function AppHeader() {
           {user?.role === 'provider' && <Link href="/providers/schools" className={linkClassName('/providers/schools')} onClick={() => setMobileMenuOpen(false)}>My Schools</Link>}
           {user?.role === 'superadmin' && <Link href="/admin" className={linkClassName('/admin')} onClick={() => setMobileMenuOpen(false)}>Admin</Link>}
           {['provider', 'customer'].includes(user?.role) && <Link href="/orders" className={linkClassName('/orders')} onClick={() => setMobileMenuOpen(false)}>{user.role === 'provider' ? 'Orders' : 'My orders'}</Link>}
+          {user ? (
+            <button type="button" className="header-nav-link header-nav-auth" onClick={() => { setMobileMenuOpen(false); logout(); }}>Sign out</button>
+          ) : (
+            <Link href="/login" className="header-nav-link header-nav-auth" onClick={() => setMobileMenuOpen(false)}>Sign in</Link>
+          )}
         </nav>
         <div className="header-actions">
           {user ? (
-            <>
-              <span className="header-user-name">{user.name}</span>
-              <button type="button" className="header-action-button" onClick={logout}>Sign out</button>
-            </>
+            <span className="header-user-name">{user.name}</span>
           ) : (
             <>
               <Link href="/login" className="header-signin">Sign in</Link>

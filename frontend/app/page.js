@@ -119,15 +119,19 @@ export default function HomePage() {
               then order hot meals in minutes.
             </p>
             <div className="hero-actions">
-              <Link href="/menu" className="btn btn-primary btn-lg">
-                Browse Menu
+              <Link href="/menu" className="btn btn-primary btn-lg hero-primary-action">
+                Browse menu <span aria-hidden="true">→</span>
               </Link>
-              <Link href="/providers" className="btn btn-outline btn-lg">
-                Find Providers
-              </Link>
-              <Link href="/schools" className="btn btn-outline btn-lg">
-                Choose Your School
-              </Link>
+              <div className="hero-secondary-actions" aria-label="Explore FoodConnect">
+                <Link href="/providers" className="hero-secondary-action">
+                  <span className="hero-secondary-icon" aria-hidden="true">⌖</span>
+                  <span>Find providers</span>
+                </Link>
+                <Link href="/schools" className="hero-secondary-action">
+                  <span className="hero-secondary-icon" aria-hidden="true">▤</span>
+                  <span>Choose your school</span>
+                </Link>
+              </div>
             </div>
             <div className="hero-stats">
               <div>
