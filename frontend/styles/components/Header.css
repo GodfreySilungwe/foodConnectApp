@@ -164,6 +164,30 @@
   color: var(--color-gray-700);
 }
 
+.header-user-profile {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.header-profile-icon {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 1px solid #e5d8ca;
+  border-radius: 50%;
+  background: var(--color-primary-bg);
+  color: var(--color-primary-dark);
+}
+
+.header-profile-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
 .header-badge {
   position: relative;
 }
@@ -249,7 +273,7 @@
   .header-mobile-toggle { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 38px; padding: 0.35rem 0.6rem; border: 1px solid transparent; border-radius: 0.8rem; background: linear-gradient(135deg, var(--color-primary) 0%, #ec8c52 100%); box-shadow: 0 12px 20px rgba(217, 101, 59, 0.18); color: var(--color-white); font-size: 0.8rem; white-space: nowrap; }
   .header-mobile-toggle:hover { transform: none; background: linear-gradient(135deg, var(--color-primary-dark) 0%, #dd7742 100%); }
   .header-nav { display: none; }
-  .header-nav.open { display: flex; position: absolute; top: 0; left: 0; right: auto; z-index: 102; width: min(76vw, 17rem); max-height: min(70dvh, 28rem); flex-direction: column; align-items: stretch; gap: 0.2rem; padding: 0.6rem; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #d9cfc4; border-radius: 1rem; background: rgba(255, 255, 255, 0.98); box-shadow: 0 18px 42px rgba(23, 42, 54, 0.2); }
+  .header-nav.open { display: flex; position: absolute; top: 0; left: 0; right: auto; z-index: 102; width: min(50vw, 17rem); min-width: 10rem; max-height: min(70dvh, 28rem); flex-direction: column; align-items: stretch; gap: 0.2rem; padding: 0.6rem; overflow-y: auto; overscroll-behavior: contain; border: 1px solid #d9cfc4; border-radius: 1rem; background: rgba(255, 255, 255, 0.98); box-shadow: 0 18px 42px rgba(23, 42, 54, 0.2); }
   .header-nav-link { flex: 0 0 auto; min-height: 44px; padding: 0.7rem 0.8rem; }
   .header-user-name { max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
@@ -271,10 +295,12 @@
   .header-mobile-toggle:hover { transform: none; background: linear-gradient(135deg, var(--color-primary-dark) 0%, #dd7742 100%); box-shadow: 0 12px 20px rgba(217, 101, 59, 0.18); }
   .header-logo-icon { display: none; }
   .header-logo span:last-child { display: none; }
-  .header-nav.open { left: 0; right: auto; width: min(78vw, 17rem); }
+  .header-nav.open { left: 0; right: auto; width: min(50vw, 17rem); min-width: 10rem; }
   .header-nav-link { font-size: 0.82rem; }
   .header-actions { gap: 0.25rem; }
   .header-signin { font-size: 0.68rem; }
   .header-user-name { max-width: 76px; font-size: 0.72rem; }
+  .header-profile-icon { width: 28px; height: 28px; flex-basis: 28px; }
+  .header-profile-icon svg { width: 15px; height: 15px; }
   .header-register, .header-action-button { min-height: 34px; padding-inline: 0.55rem; font-size: 0.72rem; white-space: nowrap; }
 }

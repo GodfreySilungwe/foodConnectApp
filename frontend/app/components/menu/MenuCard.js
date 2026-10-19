@@ -291,8 +291,8 @@ export default function MenuCard({ item, showProvider = false, providerControls 
           <p className="menu-card-description">{item.description}</p>
         )}
         {images.length > 0 && <>
-          <button type="button" className="menu-card-gallery-toggle" onClick={() => setShowAllImages(true)}>
-            View {images.length === 1 ? 'photo and details' : `${images.length} photos and details`}
+          <button type="button" className="menu-card-gallery-toggle" aria-label={`Expand ${item.name} photos and details`} onClick={() => setShowAllImages(true)}>
+            <span aria-hidden="true">⤢</span>
           </button>
         </>}
         {Array.isArray(item.availableSchools) && (
@@ -303,7 +303,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
             <input type="checkbox" checked={item.available !== false} onChange={(event) => onAvailabilityChange?.(item, event.target.checked)} />
             {item.available === false ? 'Unavailable' : 'Available to order'}
           </label>
-          <button type="button" className="menu-card-gallery-toggle" onClick={() => onEditItem?.(item)}>Edit item</button>
+          <button type="button" className="menu-card-edit-button" onClick={() => onEditItem?.(item)}>Edit item</button>
         </div> : <div className="menu-card-actions">
           <div className="menu-card-quantity">
             <button

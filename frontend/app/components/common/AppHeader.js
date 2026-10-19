@@ -74,7 +74,14 @@ export default function AppHeader() {
         </nav>
         <div className="header-actions">
           {user ? (
-            <span className="header-user-name">{user.name}</span>
+            <span className="header-user-profile">
+              <span className="header-user-name">{user.name}</span>
+              <span className="header-profile-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M12 12a4.25 4.25 0 1 0 0-8.5A4.25 4.25 0 0 0 12 12Zm0 2c-4.2 0-7.5 2.2-7.5 5v1.5h15V19c0-2.8-3.3-5-7.5-5Z" fill="currentColor" />
+                </svg>
+              </span>
+            </span>
           ) : (
             <>
               <Link href="/login" className="header-signin">Sign in</Link>
