@@ -1,5 +1,6 @@
 const express = require('express');
 const { randomUUID } = require('node:crypto');
+const { gzipSync } = require('node:zlib');
 const { createRepository } = require('./repositories');
 const { requireAuth } = require('./auth');
 const malawiDistricts = require('./malawi-districts');
@@ -60,6 +61,21 @@ const createApp = () => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+  app.use((req, res, next) => {
+    const sendJson = res.json.bind(res);
+    res.json = (body) => {
+      const serialized = JSON.stringify(body);
+      if (!serialized || Buffer.byteLength(serialized) < 1024 || !req.acceptsEncodings('gzip')) {
+        return sendJson(body);
+      }
+
+      res.vary('Accept-Encoding');
+      res.set('Content-Encoding', 'gzip');
+      res.type('json');
+      return res.send(gzipSync(serialized));
+    };
     next();
   });
   app.use(express.json({ limit: '320kb' }));
@@ -135,6 +151,44 @@ const createApp = () => {
       /^https:\/\//i.test(image)
     )
   );
+  const isEmbeddedImage = (image) => typeof image === 'string' &&
+    /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image);
+  const withProviderListImage = (provider) => isEmbeddedImage(provider.image)
+    ? { ...provider, image: `/api/providers/${encodeURIComponent(provider.id)}/image` }
+    : provider;
+  const withSchoolListImage = (school) => isEmbeddedImage(school.image)
+    ? { ...school, image: `/api/schools/${encodeURIComponent(school.id)}/image` }
+    : school;
+  const withMenuListImages = (item) => {
+    const images = Array.isArray(item.images) && item.images.length
+      ? item.images
+      : item.image
+        ? [item.image]
+        : [];
+    if (!images.length) return item;
+
+    const imageUrls = images.map((image, index) => isEmbeddedImage(image)
+      ? `/api/menu/${encodeURIComponent(item.id)}/images/${index}`
+      : image);
+    const primaryImage = item.image || images[0];
+    const primaryIndex = Math.max(0, images.indexOf(primaryImage));
+    return {
+      ...item,
+      image: isEmbeddedImage(primaryImage)
+        ? `/api/menu/${encodeURIComponent(item.id)}/images/${primaryIndex}`
+        : primaryImage,
+      images: imageUrls
+    };
+  };
+  const sendEmbeddedImage = (res, image) => {
+    const match = typeof image === 'string' &&
+      image.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+=*)$/);
+    if (!match) return res.sendStatus(404);
+
+    res.set('Cache-Control', 'public, max-age=60');
+    res.set('X-Content-Type-Options', 'nosniff');
+    return res.type(`image/${match[1]}`).send(Buffer.from(match[2], 'base64'));
+  };
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'provider-service' });
@@ -154,7 +208,7 @@ const createApp = () => {
     const rankedProviders = hasUserCoordinates
       ? sortByDistance(providers, { latitude, longitude })
       : providers;
-    res.json({ success: true, data: rankedProviders });
+    res.json({ success: true, data: rankedProviders.map(withProviderListImage) });
   });
 
   app.post('/api/providers/:providerId/ratings', requireAuth('customer'), async (req, res) => {
@@ -189,12 +243,18 @@ const createApp = () => {
     return res.json({ success: true, data: { ...withProviderRatingSummary(provider), menuCount: menu.length } });
   });
 
+  app.get('/api/providers/:providerId/image', async (req, res) => {
+    const provider = await providerRepository.findById(req.params.providerId);
+    if (!provider || !isActiveRecord(provider)) return res.sendStatus(404);
+    return sendEmbeddedImage(res, provider.image);
+  });
+
   app.get('/api/providers/:providerId/menu', async (req, res) => {
     const provider = await providerRepository.findById(req.params.providerId);
     if (!provider || !isActiveRecord(provider)) return res.status(404).json({ success: false, error: 'Provider not found' });
     const items = await menuRepository.listByProvider(req.params.providerId);
     const availableItems = await addSchoolAvailability(items, [provider]);
-    return res.json({ success: true, data: availableItems });
+    return res.json({ success: true, data: availableItems.map(withMenuListImages) });
   });
 
   app.get('/api/my/menu', requireAuth('provider'), async (req, res) => {
@@ -224,8 +284,24 @@ const createApp = () => {
       ...item,
       providerName: providerNames.get(item.providerId) || 'Food provider'
     }));
-    const items = await addSchoolAvailability(featuredItems, providers);
+    const items = (await addSchoolAvailability(featuredItems, providers)).map(withMenuListImages);
     return res.json({ success: true, data: items });
+  });
+
+  app.get('/api/menu/:menuId/images/:imageIndex', async (req, res) => {
+    const menuItem = await menuRepository.findById(req.params.menuId);
+    if (!menuItem) return res.sendStatus(404);
+
+    const images = Array.isArray(menuItem.images) && menuItem.images.length
+      ? menuItem.images
+      : menuItem.image
+        ? [menuItem.image]
+        : [];
+    const imageIndex = Number(req.params.imageIndex);
+    if (!Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex >= images.length) {
+      return res.sendStatus(404);
+    }
+    return sendEmbeddedImage(res, images[imageIndex]);
   });
 
   app.get('/api/schools', async (req, res) => {
@@ -242,7 +318,13 @@ const createApp = () => {
     const rankedSchools = hasUserCoordinates
       ? sortByDistance(schools, { latitude, longitude })
       : schools;
-    return res.json({ success: true, data: rankedSchools });
+    return res.json({ success: true, data: rankedSchools.map(withSchoolListImage) });
+  });
+
+  app.get('/api/schools/:schoolId/image', async (req, res) => {
+    const school = await schoolRepository.findById(req.params.schoolId);
+    if (!school || !isActiveRecord(school)) return res.sendStatus(404);
+    return sendEmbeddedImage(res, school.image);
   });
 
   app.get('/api/schools/:schoolId', async (req, res) => {
@@ -338,14 +420,22 @@ const createApp = () => {
     if (!(malawiDistricts.has(req.query.district) || req.query.district === 'UNKNOWN')) {
       return res.status(400).json({ success: false, error: 'A valid district is required' });
     }
-    res.json({ success: true, data: (await providerRepository.listByDistrict(req.query.district)).map(withProviderRatingSummary) });
+    res.json({
+      success: true,
+      data: (await providerRepository.listByDistrict(req.query.district))
+        .map(withProviderRatingSummary)
+        .map(withProviderListImage)
+    });
   });
 
   app.get('/api/admin/schools', requireAuth('superadmin'), async (req, res) => {
     if (!(malawiDistricts.has(req.query.district) || req.query.district === 'UNKNOWN')) {
       return res.status(400).json({ success: false, error: 'A valid district is required' });
     }
-    res.json({ success: true, data: await schoolRepository.listByDistrict(req.query.district) });
+    res.json({
+      success: true,
+      data: (await schoolRepository.listByDistrict(req.query.district)).map(withSchoolListImage)
+    });
   });
 
   app.patch('/api/admin/providers/:providerId/status', requireAuth('superadmin'), async (req, res) => {

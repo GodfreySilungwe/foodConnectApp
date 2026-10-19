@@ -18,7 +18,7 @@ const tableName = process.env.USERS_TABLE || 'foodconnect-dev-users-v2';
 const autoCreate = process.env.DYNAMODB_AUTO_CREATE_TABLES === 'true';
 const rawClient = new DynamoDBClient({
   endpoint: process.env.DYNAMODB_ENDPOINT || undefined,
-  region: process.env.AWS_REGION || 'ap-southeast-1',
+  region: process.env.AWS_REGION || 'us-east-1',
   ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
     ? {
         credentials: {

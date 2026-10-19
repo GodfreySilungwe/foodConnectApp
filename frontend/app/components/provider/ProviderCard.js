@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import { getProviderImageUrl } from '@/services/api';
 import '@/styles/components/ProviderCard.css';
 
 export default function ProviderCard({ provider }) {
@@ -19,11 +19,9 @@ export default function ProviderCard({ provider }) {
     <Link href={`/providers/${provider.id}`} className="provider-card">
       <div className="provider-card-image">
         {provider.image ? (
-          <Image
-            src={provider.image}
+          <img
+            src={getProviderImageUrl(provider.image)}
             alt={provider.name}
-            width={300}
-            height={200}
           />
         ) : (
           <div className="provider-card-image-placeholder">

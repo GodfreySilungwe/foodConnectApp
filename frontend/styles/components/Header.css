@@ -238,7 +238,7 @@
   .header-logo { grid-column: 2; grid-row: 1; justify-self: start; }
   .header-logo-icon { display: none; }
   .header-logo span:last-child { display: none; }
-  .header-nav.open { left: 1.5rem; right: auto; }
+  .header-nav.open { left: 1rem; right: auto; }
   .header-nav-link { flex: 0 0 auto; padding: 0.65rem 0.7rem; font-size: 0.82rem; }
   .header-actions { grid-column: 3; grid-row: 1; gap: 0.25rem; }
   .header-signin { display: inline-flex; font-size: 0.68rem; white-space: nowrap; }

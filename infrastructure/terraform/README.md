@@ -48,7 +48,7 @@ terraform destroy
 ## ECS application container configuration
 
 The three DynamoDB-backed services should use the ECS task role for AWS credentials. Set
-`USE_DYNAMODB=true`, `AWS_REGION=ap-southeast-1`, and
+`USE_DYNAMODB=true`, `AWS_REGION=us-east-1`, and
 `DYNAMODB_AUTO_CREATE_TABLES=false` on each service. Do not set
 `DYNAMODB_ENDPOINT`, `AWS_ACCESS_KEY_ID`, or `AWS_SECRET_ACCESS_KEY` in ECS.
 Grant each service's task role least-privilege access to its tables and indexes.
@@ -61,9 +61,26 @@ Grant each service's task role least-privilege access to its tables and indexes.
 
 Set `JWT_SECRET` from Secrets Manager (or another ECS-supported secret source), not
 as a committed value. Set `FRONTEND_ORIGIN` to the deployed web app's HTTPS origin.
-The provider and order services also need `IDENTITY_SERVICE_URL` set to an address
-they can reach inside the VPC, such as an ECS Service Connect name or private load
-balancer URL.
+
+### ECS Service Connect for identity calls
+
+Do not configure provider/order with a hardcoded EC2 public IP or the internet-facing
+ALB DNS name plus `:3002`. The ALB DNS name only accepts traffic on configured ALB
+listener ports and routes; it does not expose each target's container port directly.
+Use ECS Service Connect for private service-to-service discovery instead:
+
+1. Enable Service Connect with the same namespace (for example, `foodconnect`)
+   on the identity, provider, and order ECS services in `foodconnect-cluster2`.
+2. In the identity task definition, name the port mapping for container port `3002`
+   (for example, `identity`) and configure the identity ECS service as a Service
+   Connect server using that port mapping and the discovery name `identity-service`.
+3. Configure the provider and order tasks with
+   `IDENTITY_SERVICE_URL=http://identity-service:3002`.
+4. Deploy new task definition revisions and update/redeploy the three ECS services.
+
+The provider/order processes already read `IDENTITY_SERVICE_URL` from the environment.
+Docker Compose uses the same service DNS name locally; for local processes outside
+Compose, use `http://localhost:3002`.
 
 The frontend's `NEXT_PUBLIC_*` API URLs are embedded in the JavaScript bundle at
 image build time. Supply the deployed public API URLs as Docker build arguments

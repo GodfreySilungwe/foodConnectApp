@@ -11,6 +11,12 @@ const urls = {
   order: serviceUrl(process.env.NEXT_PUBLIC_ORDER_API_URL, 'http://localhost:3004'),
 };
 
+export const getProviderImageUrl = (image) => (
+  typeof image === 'string' && image.startsWith('/api/')
+    ? `${urls.provider}${image}`
+    : image
+);
+
 const buildQuery = (filters = {}) => {
   if (typeof filters === 'string' && filters.trim()) {
     return filters.startsWith('?') ? filters : `?${filters}`;

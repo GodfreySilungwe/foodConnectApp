@@ -75,7 +75,7 @@ services:
       USE_DYNAMODB: "true"
       DYNAMODB_AUTO_CREATE_TABLES: "true"
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
-      AWS_REGION: ap-southeast-1
+      AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
       AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
       USERS_TABLE: foodconnect-dev-users-v2
@@ -106,7 +106,7 @@ services:
       JWT_SECRET: foodconnect-development-secret
       IDENTITY_SERVICE_URL: http://identity-service:3002
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
-      AWS_REGION: ap-southeast-1
+      AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
       AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
       PROVIDERS_TABLE: foodconnect-dev-providers-v2
@@ -140,7 +140,7 @@ services:
       JWT_SECRET: foodconnect-development-secret
       IDENTITY_SERVICE_URL: http://identity-service:3002
       DYNAMODB_ENDPOINT: http://dynamodb-local:8000
-      AWS_REGION: ap-southeast-1
+      AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: fakeMyKeyId
       AWS_SECRET_ACCESS_KEY: fakeSecretAccessKey
       ORDERS_TABLE: foodconnect-dev-orders-v2

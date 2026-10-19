@@ -339,6 +339,60 @@ describe('Provider service', () => {
     ]));
   });
 
+  it('serves list images separately from lightweight discovery responses', async () => {
+    await request(app)
+      .put('/api/providers/p-001/profile')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({ image: 'data:image/jpeg;base64,AA==' })
+      .expect(200);
+
+    const menuCreateResponse = await request(app)
+      .post('/api/providers/p-001/menu')
+      .set('Authorization', `Bearer ${providerToken}`)
+      .send({
+        name: 'Image Endpoint Dish',
+        price: 15,
+        available: true,
+        images: ['data:image/png;base64,AQI=']
+      })
+      .expect(201);
+    const schoolCreateResponse = await request(app)
+      .post('/api/schools')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({
+        name: 'Image Endpoint School',
+        location: 'Lilongwe',
+        district: 'Lilongwe',
+        image: 'data:image/webp;base64,AwQ='
+      })
+      .expect(201);
+
+    const [providersResponse, menuResponse, schoolsResponse] = await Promise.all([
+      request(app).get('/api/providers'),
+      request(app).get('/api/menu/featured'),
+      request(app).get('/api/schools')
+    ]);
+    const gzipResponse = await request(app)
+      .get('/api/providers')
+      .set('Accept-Encoding', 'gzip')
+      .expect(200);
+    const provider = providersResponse.body.data.find((item) => item.id === 'p-001');
+    const menuItem = menuResponse.body.data.find((item) => item.id === menuCreateResponse.body.data.id);
+    const school = schoolsResponse.body.data.find((item) => item.id === schoolCreateResponse.body.data.id);
+
+    expect(provider.image).toBe('/api/providers/p-001/image');
+    expect(menuItem.image).toBe(`/api/menu/${menuCreateResponse.body.data.id}/images/0`);
+    expect(menuItem.images).toEqual([menuItem.image]);
+    expect(school.image).toBe(`/api/schools/${schoolCreateResponse.body.data.id}/image`);
+    expect(JSON.stringify([providersResponse.body, menuResponse.body, schoolsResponse.body])).not.toContain('base64,');
+    expect(gzipResponse.headers['content-encoding']).toBe('gzip');
+    expect(gzipResponse.body.success).toBe(true);
+
+    await request(app).get(provider.image).expect(200).expect('Content-Type', /image\/jpeg/);
+    await request(app).get(menuItem.image).expect(200).expect('Content-Type', /image\/png/);
+    await request(app).get(school.image).expect(200).expect('Content-Type', /image\/webp/);
+  });
+
   it('registers schools for authenticated school administrators', async () => {
     const response = await request(app)
       .post('/api/schools')

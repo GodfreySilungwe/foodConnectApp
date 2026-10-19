@@ -9,7 +9,7 @@ const { withIndexKeys } = require('../provider-service/dynamo');
 const { withOrderKeys } = require('./schema');
 
 const endpoint = process.env.DYNAMODB_ENDPOINT || undefined;
-const region = process.env.AWS_REGION || 'ap-southeast-1';
+const region = process.env.AWS_REGION || 'us-east-1';
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({
   endpoint,
   region,

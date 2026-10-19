@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { AuthContext } from '@/contexts/AuthContext';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import LocationPicker from '@/components/common/LocationPicker';
-import { api } from '@/services/api';
+import { api, getProviderImageUrl } from '@/services/api';
 import { getCoordinatesOrCurrentPosition } from '@/utils/location';
 import { malawiDistricts } from '@/utils/malawiDistricts';
 import { formatMWK } from '@/utils/formatCurrency';
@@ -231,7 +231,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
     >
       <div className="menu-card-image">
         {images.length ? (
-          <img src={images[Math.min(activeImageIndex, images.length - 1)]} alt={item.name} />
+          <img src={getProviderImageUrl(images[Math.min(activeImageIndex, images.length - 1)])} alt={item.name} />
         ) : (
           <div className="menu-card-image-placeholder">🍲</div>
         )}
@@ -261,7 +261,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
           </button>
           {showAllImages && <div className="menu-card-expanded-gallery">
             <div className="menu-card-gallery-stage">
-              <img className="menu-card-expanded-photo" src={images[Math.min(activeImageIndex, images.length - 1)]} alt={`${item.name}, photo ${activeImageIndex + 1}`} />
+              <img className="menu-card-expanded-photo" src={getProviderImageUrl(images[Math.min(activeImageIndex, images.length - 1)])} alt={`${item.name}, photo ${activeImageIndex + 1}`} />
               {images.length > 1 && <>
                 <button type="button" className="menu-card-gallery-previous" onClick={() => setActiveImageIndex((activeImageIndex + images.length - 1) % images.length)} aria-label="Previous photo">‹</button>
                 <span className="menu-card-gallery-count">{activeImageIndex + 1} / {images.length}</span>
@@ -270,7 +270,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
             </div>
             {images.length > 1 && <div className="menu-card-image-gallery">
               {images.map((image, index) => <button type="button" key={`${item.id}-image-${index}`} onClick={() => setActiveImageIndex(index)} aria-label={`Show photo ${index + 1}`} aria-pressed={activeImageIndex === index}>
-                <img src={image} alt={`${item.name}, photo ${index + 1}`} />
+                <img src={getProviderImageUrl(image)} alt={`${item.name}, photo ${index + 1}`} />
               </button>)}
             </div>}
           </div>}

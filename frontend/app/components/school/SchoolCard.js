@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { getProviderImageUrl } from '@/services/api';
 import '@/styles/components/SchoolCard.css';
 
 export default function SchoolCard({ school }) {
@@ -10,7 +11,7 @@ export default function SchoolCard({ school }) {
     <Link href={`/schools/${school.id}`} className="school-card">
       <div className="school-card-icon">
         {school.image ? (
-          <img src={school.image} alt={school.name} />
+          <img src={getProviderImageUrl(school.image)} alt={school.name} />
         ) : (
           <span>🏫</span>
         )}

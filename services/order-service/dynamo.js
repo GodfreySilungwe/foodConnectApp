@@ -20,7 +20,7 @@ const ordersTable = process.env.ORDERS_TABLE || 'foodconnect-dev-orders-v2';
 const paymentsTable = process.env.PAYMENTS_TABLE || 'foodconnect-dev-payments-v2';
 const rawClient = new DynamoDBClient({
   endpoint: process.env.DYNAMODB_ENDPOINT || undefined,
-  region: process.env.AWS_REGION || 'ap-southeast-1',
+  region: process.env.AWS_REGION || 'us-east-1',
   ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
     ? {
         credentials: {

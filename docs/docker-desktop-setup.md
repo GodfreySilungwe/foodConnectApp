@@ -31,7 +31,7 @@ Example:
 PORT=3001
 NODE_ENV=development
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
-AWS_REGION=ap-southeast-1
+AWS_REGION=us-east-1
 ```
 
 ## Step 3: Build and run the app
