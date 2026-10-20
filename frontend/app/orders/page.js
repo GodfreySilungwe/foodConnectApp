@@ -172,7 +172,6 @@ export default function ProviderOrdersPage() {
   const mealName = (order, item) => item.name || menuNames[`${order.providerId}:${item.menuId}`] || 'Meal name unavailable';
   const visibleOrders = orders.filter((order) => matchesSearch(
     query,
-    order.id,
     order.status,
     order.studentName,
     order.schoolName,
@@ -191,7 +190,7 @@ export default function ProviderOrdersPage() {
               {visibleOrders.map((order) => (
                 <article className="provider-order" key={order.id}>
                   <header className="provider-order-header">
-                    <h2>Order {order.id}</h2>
+                    <h2>Order details</h2>
                     <span className={`provider-order-status status-${order.status}`}>{order.status}</span>
                   </header>
                   <dl className="provider-order-details">
@@ -242,7 +241,7 @@ export default function ProviderOrdersPage() {
           {visibleOrders.map((order) => (
             <article className="provider-order" key={order.id}>
               <header className="provider-order-header">
-                <h2>Order {order.id}</h2>
+                <h2>Order details</h2>
                 <span className={`provider-order-status status-${order.status}`}>{order.status}</span>
               </header>
               <dl className="provider-order-details">

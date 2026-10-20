@@ -43,7 +43,9 @@ export default function AppHeader() {
       <div className="container header-inner">
         <Link href="/" className="header-logo">
           <span className="header-logo-icon">✦</span>
-          <span>FoodConnect</span>
+          <span className="foodconnect-wordmark" aria-label="FoodConnect">
+            FoodC<span className="foodconnect-wordmark-dot" aria-hidden="true" />nnect
+          </span>
         </Link>
         <button
           type="button"

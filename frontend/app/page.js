@@ -152,7 +152,12 @@ export default function HomePage() {
       <section className="hero">
         <div className="container hero-inner">
           <div className="hero-content">
-            <div className="hero-tag">Fast delivery • Fresh meals</div>
+            <div className="hero-intro">
+              <span className="foodconnect-wordmark" aria-label="FoodConnect">
+                FoodC<span className="foodconnect-wordmark-dot" aria-hidden="true" />nnect
+              </span>
+              <div className="hero-tag">Fast delivery · Fresh meals</div>
+            </div>
             <h1 className="hero-title">
               School Lunch,
               <br /><span className="hero-highlight">in Minutes</span>
@@ -309,7 +314,7 @@ export default function HomePage() {
       </section>}
 
       {/* Dashboard Stats for Authenticated Users */}
-      {user && (
+      {user && user.role !== 'customer' && (
         <section className="section">
           <div className="container">
             <DashboardStats stats={stats} />

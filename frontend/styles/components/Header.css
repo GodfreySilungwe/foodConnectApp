@@ -43,6 +43,28 @@
   box-shadow: 0 12px 24px rgba(217, 101, 59, 0.22);
 }
 
+.foodconnect-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--color-secondary);
+  font-size: inherit;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.foodconnect-wordmark-dot {
+  display: inline-block;
+  width: 0.48em;
+  height: 0.48em;
+  flex: 0 0 0.48em;
+  margin: 0 0.025em 0 0.015em;
+  border-radius: 50%;
+  background: var(--color-primary);
+  transform: translateY(-0.04em);
+}
+
 .header-nav {
   display: flex;
   align-items: center;
