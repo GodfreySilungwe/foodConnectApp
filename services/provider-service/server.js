@@ -144,6 +144,29 @@ const createApp = () => {
       };
     });
   };
+  const rankProvidersByServedSchoolDistance = async (providers, origin) => {
+    if (!Number.isFinite(origin?.latitude) || !Number.isFinite(origin?.longitude)) return providers;
+    const schoolIds = [...new Set(providers.flatMap((provider) => provider.schoolIds || []))];
+    const schools = await Promise.all(schoolIds.map((schoolId) => schoolRepository.findById(schoolId)));
+    const schoolById = new Map(schools.filter((school) => school && isActiveRecord(school)).map((school) => [school.id, school]));
+    return providers.map((provider) => {
+      const distances = (provider.schoolIds || [])
+        .map((schoolId) => schoolById.get(schoolId))
+        .filter(Boolean)
+        .map((school) => distanceKmBetween(origin, school))
+        .filter(Number.isFinite);
+      return {
+        ...provider,
+        distanceKm: distances.length ? Math.min(...distances) : null,
+        distanceLabel: 'to a served school'
+      };
+    }).sort((left, right) => {
+      if (left.distanceKm == null && right.distanceKm == null) return 0;
+      if (left.distanceKm == null) return 1;
+      if (right.distanceKm == null) return -1;
+      return left.distanceKm - right.distanceKm;
+    });
+  };
 
   const isValidProfileImage = (image) => image === undefined || image === null || image === '' || (
     typeof image === 'string' && image.length <= 160000 && (
@@ -205,9 +228,10 @@ const createApp = () => {
       ? await providerRepository.listByDistrict(req.query.district)
       : await providerRepository.list();
     const providers = records.filter(isActiveRecord).map(withProviderRatingSummary);
-    const rankedProviders = hasUserCoordinates
-      ? sortByDistance(providers, { latitude, longitude })
-      : providers;
+    const rankedProviders = await rankProvidersByServedSchoolDistance(
+      providers,
+      hasUserCoordinates ? { latitude, longitude } : null
+    );
     res.json({ success: true, data: rankedProviders.map(withProviderListImage) });
   });
 

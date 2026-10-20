@@ -69,6 +69,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(credentials),
     }),
+  refreshSession: (token) =>
+    request(`${urls.identity}/api/auth/refresh`, { method: 'POST' }, token),
 
   register: (user) =>
     request(`${urls.identity}/api/auth/register`, {

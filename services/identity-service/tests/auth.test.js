@@ -22,6 +22,7 @@ describe('Identity service auth', () => {
     expect(response.statusCode).toBe(201);
     expect(response.body.success).toBe(true);
     expect(response.body.data.email).toBe('alice@example.com');
+    expect(jwt.decode(response.body.data.token).exp).toBeUndefined();
   });
 
   it('seeds the requested development super-admin account', async () => {
@@ -143,6 +144,31 @@ describe('Identity service auth', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.user.role).toBe('customer');
     expect(response.body.data.token).toBeTruthy();
+    expect(jwt.decode(response.body.data.token).exp).toBeUndefined();
+  });
+
+  it('upgrades a valid legacy customer token to a non-expiring session', async () => {
+    const legacyToken = jwt.sign(
+      { userId: 'u-001', role: 'customer' },
+      'foodconnect-development-secret',
+      { expiresIn: '2h' }
+    );
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Authorization', ['Bearer ', legacyToken].join(''));
+
+    expect(response.statusCode).toBe(200);
+    expect(jwt.decode(response.body.data.token).exp).toBeUndefined();
+    expect(response.body.data.user.userId).toBe('u-001');
+  });
+
+  it('preserves the existing two-hour expiry for provider sessions', async () => {
+    const response = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'provider@example.com', password: '123456' });
+
+    expect(response.statusCode).toBe(200);
+    expect(jwt.decode(response.body.data.token).exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
   });
 
   it('rejects invalid login credentials', async () => {

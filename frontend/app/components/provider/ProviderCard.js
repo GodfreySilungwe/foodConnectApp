@@ -13,7 +13,9 @@ export default function ProviderCard({ provider }) {
   const ratingValue = Number(provider?.rating ?? provider?.averageRating ?? 0) || 0;
   const starCount = Math.min(5, Math.max(0, Math.round(ratingValue)));
   const stars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
-  const distanceText = Number.isFinite(provider?.distanceKm) ? `${provider.distanceKm.toFixed(1)} km away` : null;
+  const distanceText = Number.isFinite(provider?.distanceKm)
+    ? `${provider.distanceKm.toFixed(1)} km ${provider.distanceLabel || 'away'}`
+    : null;
 
   return (
     <Link href={`/providers/${provider.id}`} className="provider-card">

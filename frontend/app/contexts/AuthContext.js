@@ -11,17 +11,50 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('foodconnect-session');
-    if (stored) {
-      try {
-        const session = JSON.parse(stored);
-        setUser(session.user);
-        setToken(session.token);
-      } catch (e) {
-        localStorage.removeItem('foodconnect-session');
+    let mounted = true;
+    const restoreSession = async () => {
+      const stored = localStorage.getItem('foodconnect-session');
+      if (stored) {
+        try {
+          let session = JSON.parse(stored);
+          setUser(session.user);
+          setToken(session.token);
+
+          if (session.user?.role === 'customer') {
+            try {
+              const refreshed = await api.refreshSession(session.token);
+              session = refreshed.data;
+              if (mounted) {
+                setUser(session.user);
+                setToken(session.token);
+                localStorage.setItem('foodconnect-session', JSON.stringify(session));
+              }
+            } catch (error) {
+              if (error.message === 'Invalid or expired token') {
+                localStorage.removeItem('foodconnect-session');
+                if (mounted) {
+                  setUser(null);
+                  setToken(null);
+                }
+              } else {
+                console.error('Failed to refresh parent session:', error);
+              }
+            }
+          }
+        } catch (error) {
+          localStorage.removeItem('foodconnect-session');
+          if (error instanceof SyntaxError) {
+            console.error('Stored FoodConnect session is invalid JSON:', error);
+          } else {
+            throw error;
+          }
+        }
       }
-    }
-    setLoading(false);
+      if (mounted) setLoading(false);
+    };
+
+    restoreSession();
+    return () => { mounted = false; };
   }, []);
 
   const login = async (email, password) => {

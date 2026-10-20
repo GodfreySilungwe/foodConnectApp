@@ -13,16 +13,12 @@ import Link from 'next/link';
 import '@/styles/components/MenuCard.css';
 
 const distanceKmBetween = (first, second) => {
-  if (!Number.isFinite(first?.latitude) || !Number.isFinite(first?.longitude) || !Number.isFinite(second?.latitude) || !Number.isFinite(second?.longitude)) {
-    return null;
-  }
-
+  if (![first?.latitude, first?.longitude, second?.latitude, second?.longitude].every(Number.isFinite)) return null;
   const radians = (degrees) => degrees * Math.PI / 180;
   const latitudeDelta = radians(second.latitude - first.latitude);
   const longitudeDelta = radians(second.longitude - first.longitude);
   const haversine = Math.sin(latitudeDelta / 2) ** 2 +
     Math.cos(radians(first.latitude)) * Math.cos(radians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
-
   return Math.round(6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)) * 10) / 10;
 };
 
@@ -113,17 +109,20 @@ export default function MenuCard({ item, showProvider = false, providerControls 
         api.getProvider(item.providerId),
       ]);
       const providerSchoolIds = providerResult.data?.schoolIds || [];
-      const availableSchools = (schoolResult.data || []).filter((school) => providerSchoolIds.includes(school.id));
+      const itemSchools = new Map((item.availableSchools || []).map((school) => [school.id, school]));
+      const providerLocation = {
+        latitude: providerResult.data?.latitude,
+        longitude: providerResult.data?.longitude,
+      };
+      const availableSchools = (schoolResult.data || [])
+        .filter((school) => providerSchoolIds.includes(school.id))
+        .map((school) => ({
+          ...school,
+          distanceKm: itemSchools.get(school.id)?.distanceKm ?? distanceKmBetween(providerLocation, school),
+        }));
       setSchools(availableSchools);
       setSchoolId(availableSchools[0]?.id || '');
-
-      const parentLocation = user && Number.isFinite(user.latitude) && Number.isFinite(user.longitude)
-        ? { latitude: user.latitude, longitude: user.longitude }
-        : null;
-      const providerLocation = Number.isFinite(providerResult.data?.latitude) && Number.isFinite(providerResult.data?.longitude)
-        ? { latitude: providerResult.data.latitude, longitude: providerResult.data.longitude }
-        : null;
-      setEstimatedDistanceKm(parentLocation && providerLocation ? distanceKmBetween(parentLocation, providerLocation) : null);
+      setEstimatedDistanceKm(availableSchools[0]?.distanceKm ?? null);
 
       if (!availableSchools.length) setSchoolError('This provider has no associated schools available for ordering yet.');
     } catch (error) {
@@ -428,7 +427,7 @@ export default function MenuCard({ item, showProvider = false, providerControls 
                 label="Select your home or pickup location"
                 autoLocate
               />
-              {estimatedDistanceKm !== null && <p className="checkout-hint">Estimated distance from your saved location to this provider: {estimatedDistanceKm.toFixed(1)} km</p>}
+              {estimatedDistanceKm !== null && <p className="checkout-hint">Estimated distance from provider to school location: {estimatedDistanceKm.toFixed(1)} km</p>}
               {signupError && <p className="checkout-error" role="alert">{signupError} <button type="button" className="checkout-inline-action" onClick={() => { setSigninForm((current) => ({ ...current, email: signupForm.email })); setSignupError(''); setShowSignup(false); setShowSignin(true); }}>Sign in</button></p>}
               {!signupError && <p className="checkout-hint">Already have an account? <button type="button" className="checkout-inline-action" onClick={() => { setSigninForm((current) => ({ ...current, email: signupForm.email })); setShowSignup(false); setShowSignin(true); }}>Sign in</button></p>}
             </> : showSignin ? <>
@@ -448,15 +447,19 @@ export default function MenuCard({ item, showProvider = false, providerControls 
                 <input id={`student-class-${item.id}`} value={studentClass} onChange={(event) => setStudentClass(event.target.value)} placeholder="For example, Year 4" required maxLength={60} />
               </label>
               <label className="checkout-field" htmlFor={`school-${item.id}`}>School
-                <select id={`school-${item.id}`} value={schoolId} onChange={(event) => setSchoolId(event.target.value)} required disabled={!schools.length}>
+                <select id={`school-${item.id}`} value={schoolId} onChange={(event) => {
+                  const selectedSchool = schools.find((school) => school.id === event.target.value);
+                  setSchoolId(event.target.value);
+                  setEstimatedDistanceKm(selectedSchool?.distanceKm ?? null);
+                }} required disabled={!schools.length}>
                   {isLoadingSchools ? <option value="">Loading schools...</option> : schools.length ? schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>) : <option value="">No schools available</option>}
                 </select>
               </label>
               <label className="checkout-field" htmlFor={`food-preferences-${item.id}`}>Food preferences or allergies
                 <textarea id={`food-preferences-${item.id}`} value={foodPreferences} onChange={(event) => setFoodPreferences(event.target.value)} placeholder="Allergies, ingredients to avoid, or preparation requests" maxLength={500} rows={3} />
               </label>
-              {user && Number.isFinite(user.latitude) && Number.isFinite(user.longitude) && estimatedDistanceKm !== null && (
-                <p className="checkout-hint">Estimated distance from your saved home location: {estimatedDistanceKm.toFixed(1)} km</p>
+              {estimatedDistanceKm !== null && (
+                <p className="checkout-hint">Estimated distance from provider to school location: {estimatedDistanceKm.toFixed(1)} km</p>
               )}
             </>}
             {schoolError && <p className="checkout-error" role="alert">{schoolError}</p>}

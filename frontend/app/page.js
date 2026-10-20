@@ -14,10 +14,11 @@ import { matchesSearch } from '@/utils/search';
 import '@/styles/pages/Home.css';
 
 export default function HomePage() {
-  const { user } = useContext(AuthContext);
+  const { user, token, loading: authLoading } = useContext(AuthContext);
   const [featuredProviders, setFeaturedProviders] = useState([]);
   const [featuredMenu, setFeaturedMenu] = useState([]);
   const [schools, setSchools] = useState([]);
+  const [parentOrders, setParentOrders] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
@@ -29,19 +30,23 @@ export default function HomePage() {
   });
 
   useEffect(() => {
+    if (authLoading) return undefined;
+    let active = true;
     const loadData = async () => {
+      setLoading(true);
       try {
         const location = user && Number.isFinite(user.latitude) && Number.isFinite(user.longitude)
           ? { latitude: user.latitude, longitude: user.longitude }
           : null;
-        setUserLocation(location);
+        if (active) setUserLocation(location);
 
         const [providersRes, menuRes, schoolsRes] = await Promise.all([
-          api.getProviders(location ? `?latitude=${location.latitude}&longitude=${location.longitude}` : ''),
+          api.getProviders(),
           api.getFeaturedMenu(),
           api.getSchools(location ? `?latitude=${location.latitude}&longitude=${location.longitude}` : ''),
         ]);
 
+        if (!active) return;
         setFeaturedProviders(providersRes.data || []);
         setFeaturedMenu(menuRes.data || []);
         setSchools(schoolsRes.data || []);
@@ -52,29 +57,53 @@ export default function HomePage() {
           totalOrders: 156,
           activeOrders: 23,
         });
+
+        if (user?.role === 'customer' && token) {
+          try {
+            const ordersRes = await api.getOrders(token, { limit: 100 });
+            if (active) setParentOrders(ordersRes.data || []);
+          } catch (error) {
+            console.error('Failed to load parent order history for homepage personalization:', error);
+          }
+        } else {
+          if (active) setParentOrders([]);
+        }
       } catch (error) {
-        console.error('Failed to load data:', error);
+        if (active) console.error('Failed to load data:', error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     loadData();
-  }, []);
+    return () => { active = false; };
+  }, [authLoading, user, token]);
 
+  const schoolDistanceById = new Map(schools.map((school) => [school.id, school.distanceKm]));
+  const getNearestServedSchoolDistance = (schoolIds = []) => schoolIds
+    .map((schoolId) => schoolDistanceById.get(schoolId))
+    .filter(Number.isFinite)
+    .reduce((nearest, distance) => Math.min(nearest, distance), Infinity);
   const sortedSchools = userLocation ? [...schools].sort((left, right) => {
-    const leftDistance = Number(left.distanceKm ?? Infinity);
-    const rightDistance = Number(right.distanceKm ?? Infinity);
+    const leftDistance = Number.isFinite(left.distanceKm) ? left.distanceKm : Infinity;
+    const rightDistance = Number.isFinite(right.distanceKm) ? right.distanceKm : Infinity;
     return leftDistance - rightDistance;
   }) : schools;
-  const sortedProviders = userLocation ? [...featuredProviders].sort((left, right) => {
-    const leftDistance = Number(left.distanceKm ?? Infinity);
-    const rightDistance = Number(right.distanceKm ?? Infinity);
+  const sortedProviders = userLocation
+    ? featuredProviders.map((provider) => ({
+      ...provider,
+      distanceKm: getNearestServedSchoolDistance(provider.schoolIds),
+      distanceLabel: 'to a served school',
+    })).sort((left, right) => left.distanceKm - right.distanceKm)
+    : featuredProviders;
+  const sortedMenu = userLocation ? [...featuredMenu].sort((left, right) => {
+    const leftDistance = getNearestServedSchoolDistance((left.availableSchools || []).map((school) => school.id));
+    const rightDistance = getNearestServedSchoolDistance((right.availableSchools || []).map((school) => school.id));
     return leftDistance - rightDistance;
-  }) : featuredProviders;
+  }) : featuredMenu;
 
   const filteredSchools = sortedSchools.filter((school) => matchesSearch(query, school.name, school.location));
-  const filteredMenu = featuredMenu.filter((item) => matchesSearch(
+  const filteredMenu = sortedMenu.filter((item) => matchesSearch(
     query,
     item.name,
     item.description,
@@ -89,11 +118,25 @@ export default function HomePage() {
     provider.location,
     schools.filter((school) => (provider.schoolIds || []).includes(school.id)).map((school) => school.name).join(' ')
   ));
-  const visibleSchools = query ? filteredSchools : filteredSchools.slice(0, 3);
-  const visibleMenu = query ? filteredMenu : filteredMenu.slice(0, 6);
-  const visibleProviders = query ? filteredProviders : filteredProviders.slice(0, 4);
+  const hasQuery = Boolean(query.trim());
+  const visibleSchools = hasQuery ? filteredSchools : filteredSchools.slice(0, 3);
+  const visibleMenu = hasQuery ? filteredMenu : filteredMenu.slice(0, 6);
+  const visibleProviders = hasQuery ? filteredProviders : filteredProviders.slice(0, 4);
+  const familyChildren = [...new Map(parentOrders
+    .filter((order) => order.studentName)
+    .map((order) => {
+      const key = `${order.studentName.trim().toLowerCase()}:${order.schoolId || ''}`;
+      const schoolName = order.schoolName || schools.find((school) => school.id === order.schoolId)?.name;
+      return [key, {
+        key,
+        name: order.studentName,
+        studentClass: order.studentClass,
+        schoolName,
+      }];
+    })).values()];
+  const familySchools = [...new Set(familyChildren.map((child) => child.schoolName).filter(Boolean))];
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="loading-screen">
         <div className="loading-spinner" />
@@ -111,8 +154,8 @@ export default function HomePage() {
           <div className="hero-content">
             <div className="hero-tag">Fast delivery • Fresh meals</div>
             <h1 className="hero-title">
-              <span className="hero-highlight">Local food</span>
-              <br />made easy.
+              School Lunch,
+              <br /><span className="hero-highlight">in Minutes</span>
             </h1>
             <p className="hero-description">
               Discover trusted school and community food providers near you,
@@ -151,61 +194,119 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Menu */}
-      <section className="section">
+      {user?.role === 'customer' && (
+        <section className="home-family-section" aria-labelledby="home-family-title">
+          <div className="container">
+            <div className="home-family-card">
+              <div>
+                <p className="home-family-eyebrow">Your FoodConnect</p>
+                <h2 id="home-family-title">Welcome back, {user.name}</h2>
+                {familyChildren.length ? (
+                  <>
+                    <p className="home-family-description">Quickly find meals connected to your family.</p>
+                    <div className="home-family-list">
+                      {familyChildren.slice(0, 4).map((child) => (
+                        <span className="home-family-chip" key={child.key}>
+                          <strong>{child.name}</strong>
+                          {child.studentClass ? ` · ${child.studentClass}` : ''}
+                          {child.schoolName ? ` · ${child.schoolName}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                    {familySchools.length > 0 && <p className="home-family-schools">Schools in your recent orders: {familySchools.join(', ')}</p>}
+                  </>
+                ) : (
+                  <p className="home-family-description">Place an order for your child to see their name and school here.</p>
+                )}
+              </div>
+              <Link href={familyChildren.length ? '/orders' : '/menu'} className="btn btn-primary">
+                {familyChildren.length ? 'View orders' : 'Browse meals'}
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section className={`section ${hasQuery ? 'home-search-results-section' : ''}`}>
         <div className="container">
           <SearchField value={query} onChange={setQuery} placeholder="Search dishes, providers, or schools" label="Search dishes, providers, and schools" />
-          <div className="section-header">
-            <div>
-              <h2>Popular Dishes</h2>
-              <p className="section-subtitle">
-                Order directly from the menu
-              </p>
+          {hasQuery ? (
+            <div className="home-search-results" aria-label="Search results">
+              <h2>Search results</h2>
+              <section className="home-search-group" aria-labelledby="home-search-menu-title">
+                <div className="section-header">
+                  <h3 id="home-search-menu-title">Menu</h3>
+                  <Link href="/menu" className="btn btn-ghost">Full menu →</Link>
+                </div>
+                {filteredMenu.length ? <MenuGrid items={filteredMenu} showProvider /> : <p className="home-search-empty">No menu items match your search.</p>}
+              </section>
+              <section className="home-search-group" aria-labelledby="home-search-providers-title">
+                <div className="section-header">
+                  <h3 id="home-search-providers-title">Providers</h3>
+                  <Link href="/providers" className="btn btn-ghost">All providers →</Link>
+                </div>
+                {filteredProviders.length ? (
+                  <div className="provider-grid">
+                    {filteredProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}
+                  </div>
+                ) : <p className="home-search-empty">No providers match your search.</p>}
+              </section>
+              <section className="home-search-group" aria-labelledby="home-search-schools-title">
+                <div className="section-header">
+                  <h3 id="home-search-schools-title">Schools</h3>
+                  <Link href="/schools" className="btn btn-ghost">All schools →</Link>
+                </div>
+                {filteredSchools.length ? (
+                  <div className="school-grid">
+                    {filteredSchools.map((school) => <SchoolCard key={school.id} school={school} />)}
+                  </div>
+                ) : <p className="home-search-empty">No schools match your search.</p>}
+              </section>
             </div>
-            <Link href="/menu" className="btn btn-ghost">
-              View Full Menu →
-            </Link>
-          </div>
-          {visibleMenu.length ? <MenuGrid items={visibleMenu} showProvider /> : query && <p className="home-search-empty">No dishes match your search.</p>}
+          ) : (
+            <>
+              <div className="section-header">
+                <div>
+                  <h2>Popular Dishes</h2>
+                  <p className="section-subtitle">Recommended for nearby schools</p>
+                </div>
+                <Link href="/menu" className="btn btn-ghost">View Full Menu →</Link>
+              </div>
+              {visibleMenu.length ? <MenuGrid items={visibleMenu} showProvider /> : <p className="home-search-empty">No menu items are available yet.</p>}
+            </>
+          )}
         </div>
       </section>
 
-      {/* Featured Providers */}
-      <section className="section section-alt">
+      {!hasQuery && <section className="section section-alt">
         <div className="container">
           <div className="section-header">
             <div>
               <h2>Top Providers</h2>
-              <p className="section-subtitle">
-                Discover the best food providers in your area
-              </p>
+              <p className="section-subtitle">Ranked by distance to the schools they serve</p>
             </div>
             <Link href="/providers" className="btn btn-ghost">View All →</Link>
           </div>
           <div className="provider-grid">
             {visibleProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}
           </div>
-          {query && !visibleProviders.length && <p className="home-search-empty">No providers match your search.</p>}
         </div>
-      </section>
+      </section>}
 
-      {/* Schools Section */}
-      <section className="section section-alt">
+      {!hasQuery && <section className="section section-alt">
         <div className="container">
           <div className="section-header">
             <div>
               <h2>Registered Schools</h2>
-              <p className="section-subtitle">
-                Schools offering food services
-              </p>
+              <p className="section-subtitle">Schools ranked by distance from your saved home location</p>
             </div>
             <Link href="/schools" className="btn btn-ghost">All Schools →</Link>
           </div>
           {visibleSchools.length ? <div className="school-grid">
             {visibleSchools.map((school) => <SchoolCard key={school.id} school={school} />)}
-          </div> : query && <p className="home-search-empty">No schools match your search.</p>}
+          </div> : <p className="home-search-empty">No schools are registered yet.</p>}
         </div>
-      </section>
+      </section>}
 
       {/* Dashboard Stats for Authenticated Users */}
       {user && (

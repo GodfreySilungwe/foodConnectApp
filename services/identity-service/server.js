@@ -9,6 +9,20 @@ const malawiDistricts = require('./malawi-districts');
 const jwtSecret = process.env.JWT_SECRET || 'foodconnect-development-secret';
 
 const normalizeEmail = (email) => typeof email === 'string' ? email.trim().toLowerCase() : '';
+const createAuthToken = (user) => {
+  const claims = {
+    userId: user.id,
+    role: user.role,
+    email: user.email,
+    district: user.district || null,
+    latitude: user.latitude ?? null,
+    longitude: user.longitude ?? null,
+    ...(user.providerId ? { providerId: user.providerId } : {})
+  };
+  return user.role === 'customer'
+    ? jwt.sign(claims, jwtSecret)
+    : jwt.sign(claims, jwtSecret, { expiresIn: '2h' });
+};
 
 const validCoordinates = (latitude, longitude) => {
   const coordinatesMissing = (latitude === undefined || latitude === null) && (longitude === undefined || longitude === null);
@@ -60,6 +74,18 @@ const createApp = () => {
     }
     const { password, passwordHash, ...safeUser } = user;
     return res.json({ success: true, data: safeUser });
+  });
+
+  app.post('/api/auth/refresh', requireAuth('customer'), async (req, res) => {
+    const user = await userRepository.findById(req.user.userId);
+    if (!user || user.role !== 'customer' || (user.status && user.status !== 'active')) {
+      return res.status(403).json({ success: false, error: 'This account is inactive' });
+    }
+    const { password, passwordHash, ...safeUser } = user;
+    return res.json({
+      success: true,
+      data: { token: createAuthToken(user), user: { ...safeUser, userId: user.id } }
+    });
   });
 
   app.get('/api/users', requireAuth('admin'), async (req, res) => {
@@ -162,15 +188,7 @@ const createApp = () => {
     return res.status(201).json({
       success: true,
       data: {
-        token: jwt.sign({
-          userId: newUser.id,
-          role: newUser.role,
-          email: newUser.email,
-          district: newUser.district,
-          latitude: newUser.latitude ?? null,
-          longitude: newUser.longitude ?? null,
-          ...(newUser.providerId ? { providerId: newUser.providerId } : {}),
-        }, jwtSecret, { expiresIn: '2h' }),
+        token: createAuthToken(newUser),
         user: registeredUser,
         userId: newUser.id,
         name: newUser.name,
@@ -220,15 +238,7 @@ const createApp = () => {
     return res.status(200).json({
       success: true,
       data: {
-        token: jwt.sign({
-          userId: user.id,
-          role: user.role,
-          email: user.email,
-          district: user.district || null,
-          latitude: user.latitude ?? null,
-          longitude: user.longitude ?? null,
-          ...(user.providerId ? { providerId: user.providerId } : {})
-        }, jwtSecret, { expiresIn: '2h' }),
+        token: createAuthToken(user),
         user: {
           userId: user.id,
           name: user.name,

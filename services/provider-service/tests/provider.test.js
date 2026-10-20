@@ -85,7 +85,7 @@ describe('Provider service', () => {
     expect(unauthorizedResponse.statusCode).toBe(403);
   });
 
-  it('sorts providers and schools by distance from the supplied coordinates', async () => {
+  it('ranks providers by distance to served schools, not provider coordinates', async () => {
     const nearbyProviderResponse = await request(app)
       .post('/api/providers')
       .set('Authorization', `Bearer ${nearbyProviderToken}`)
@@ -115,13 +115,26 @@ describe('Provider service', () => {
       });
     expect(nearbySchoolResponse.statusCode).toBe(201);
 
-    const nearbyProviders = await request(app).get('/api/providers?latitude=-13.9626&longitude=33.7741');
-    expect(nearbyProviders.statusCode).toBe(200);
-    expect(nearbyProviders.body.data[0].name).toBe('Nearest Kitchen');
+      const coverageResponse = await request(app)
+        .put('/api/providers/p-001/schools')
+        .set('Authorization', ['Bearer ', providerToken].join(''))
+        .send({ schoolIds: [nearbySchoolResponse.body.data.id] });
+      expect(coverageResponse.statusCode).toBe(200);
 
-    const nearbySchools = await request(app).get('/api/schools?latitude=-13.9626&longitude=33.7741');
-    expect(nearbySchools.statusCode).toBe(200);
-    expect(nearbySchools.body.data[0].name).toBe('Nearby School');
+      const nearbyProviders = await request(app).get('/api/providers?latitude=-13.9626&longitude=33.7741');
+      expect(nearbyProviders.statusCode).toBe(200);
+      expect(nearbyProviders.body.data[0].name).toBe('Sunrise Kitchen');
+      expect(nearbyProviders.body.data[0].distanceKm).toBe(0);
+      expect(nearbyProviders.body.data[0].distanceLabel).toBe('to a served school');
+
+      const nearbySchools = await request(app).get('/api/schools?latitude=-13.9626&longitude=33.7741');
+      expect(nearbySchools.statusCode).toBe(200);
+      expect(nearbySchools.body.data[0].name).toBe('Nearby School');
+
+      await request(app)
+        .put('/api/providers/p-001/schools')
+        .set('Authorization', ['Bearer ', providerToken].join(''))
+        .send({ schoolIds: ['s-001'] });
   });
 
   it('returns distance and approximate delivery time for located provider-school pairs', async () => {
