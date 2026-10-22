@@ -14,6 +14,7 @@ This repository contains the project code and documentation. The application use
 | Deployed application | [Open FoodConnect](http://foodconnectalb-634192677.us-east-1.elb.amazonaws.com:3000/) — I verified that it returned HTTP 200 on 21 October 2026. |
 | Design and testing document | [Read my design and testing report](docs/capstone-design-and-testing.md) |
 | Agile task board | [View my FoodConnect GitHub Projects board](https://github.com/users/GodfreySilungwe/projects/1) |
+| Recorded presentation | [Watch my FoodConnect presentation](https://drive.google.com/file/d/1nNwAUdFNJUrDBMV-InfCAyxKBUzA_sXj/view?usp=sharing) |
 
 ## What I implemented
 
