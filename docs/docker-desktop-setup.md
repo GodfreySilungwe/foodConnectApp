@@ -1,93 +1,60 @@
-# Docker Desktop Setup for FoodConnect
+# Local Docker Setup
 
-## Goal
-
-This document explains how to run the Sprint 1 application locally with Docker Desktop before deploying to AWS ECS Fargate.
+This guide describes how to run the FoodConnect web application and domain services locally using the root `docker-compose.yml`.
 
 ## Requirements
 
-- Docker Desktop installed and running
-- Windows 10/11 with WSL 2 enabled if required by Docker Desktop
-- Git installed
+- Docker Desktop with Docker Compose enabled
+- Git
 
-## Step 1: Start Docker Desktop
+## Start the stack
 
-1. Open Docker Desktop.
-2. Wait until the Docker engine is fully running.
-3. Verify:
-
-```bash
-docker --version
-docker compose version
-```
-
-## Step 2: Create the environment file
-
-At the project root, create a `.env` file based on `.env.example`.
-
-Example:
-
-```env
-PORT=3001
-NODE_ENV=development
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
-AWS_REGION=us-east-1
-```
-
-## Step 3: Build and run the app
-
-From the project root:
+From the repository root:
 
 ```bash
 docker compose up --build
 ```
 
-This will start:
-- backend on port 3001
-- frontend on port 3000
+Compose starts:
 
-## Step 4: Verify the app is running
+| Component | Local URL/port |
+| --- | --- |
+| Next.js frontend | `http://localhost:3000` |
+| Backend API | `http://localhost:3001` |
+| Identity service | `http://localhost:3002` |
+| Provider service | `http://localhost:3003` |
+| Order service | `http://localhost:3004` |
+| DynamoDB Local | `http://localhost:8000` |
 
-Check backend health:
+Open `http://localhost:3000` in a browser. Compose sets the local development values and fake AWS credentials used by DynamoDB Local.
+
+## Verify service health
+
+The Compose configuration defines health checks for the backend and domain services. You can also request the health routes:
 
 ```bash
 curl http://localhost:3001/health
+curl http://localhost:3002/health
+curl http://localhost:3003/health
+curl http://localhost:3004/health
 ```
 
-Expected response:
+Check container state and logs with:
 
-```json
-{"status":"ok","service":"foodconnect-backend"}
+```bash
+docker compose ps
+docker compose logs -f
 ```
 
-Open the frontend in a browser:
-
-```text
-http://localhost:3000
-```
-
-## Step 5: Stop the app
+## Stop the stack
 
 ```bash
 docker compose down
 ```
 
-## Step 6: Rebuild after code changes
-
-```bash
-docker compose up --build
-```
+The `dynamodb-data` named volume preserves local database files. `docker compose down -v` removes that volume and its local data.
 
 ## Notes
 
-- Docker Compose is used for local development and validation.
-- AWS ECS/Fargate will be used for cloud deployment in the later sprint.
-- Keep container definitions simple for Sprint 1.
-
-## Useful Docker Compose Commands
-
-```bash
-docker compose ps
-docker compose logs -f
-docker compose down -v
-```
+- Root Compose enables DynamoDB table auto-creation and supplies the local service endpoint configuration.
+- Compose uses fake AWS credentials for DynamoDB Local.

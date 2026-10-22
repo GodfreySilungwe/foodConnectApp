@@ -1,142 +1,102 @@
-﻿# FoodConnect
+# FoodConnect
 
-FoodConnect is a Malawi-focused food ordering and school supply platform that helps families discover nearby food providers and schools in a way that feels local, quick, and trustworthy. The product is designed for a real-world campus and community setting, where ordering should feel convenient even when the user is not yet logged in and where data should stay fast and predictable at scale.
+Dear Grader,
 
-## Product goals
+I built FoodConnect as a Malawi-focused school meal discovery and ordering application. Parents can explore schools, food providers, and menus, then place and follow orders. Providers can manage their listings and incoming orders, while school and administrator accounts support the school directory.
 
-- Rank providers and schools by actual distance from the user when coordinates are available.
-- Keep the app usable for anonymous users through browser geolocation and saved location cues.
-- Separate customer, provider, school, and order responsibilities into purpose-built services.
-- Use DynamoDB access patterns and bounded queries instead of broad table scans.
-- Keep the experience local-first for Malawi, with district filtering and location-aware discovery.
+This repository contains the project code and documentation. The application uses a Next.js frontend, Node.js/Express services, and DynamoDB. My [design and testing report](docs/capstone-design-and-testing.md) describes the implemented architecture, design patterns, and test results.
 
-## Architecture overview
+## Project links
 
-FoodConnect is built as a small service-oriented application with a Next.js frontend and several Node.js microservices behind it:
+| Deliverable | Link or status |
+| --- | --- |
+| Source repository | [GodfreySilungwe/foodConnectApp](https://github.com/GodfreySilungwe/foodConnectApp) |
+| Deployed application | [Open FoodConnect](http://foodconnectalb-634192677.us-east-1.elb.amazonaws.com:3000/) — I verified that it returned HTTP 200 on 21 October 2026. |
+| Design and testing document | [Read my design and testing report](docs/capstone-design-and-testing.md) |
+| Agile task board | [View my FoodConnect GitHub Projects board](https://github.com/users/GodfreySilungwe/projects/1) |
 
-- Frontend: Next.js app for browsing providers, schools, menus, and ordering flows.
-- Identity service: authentication and account registration.
-- Provider service: provider registration, school coverage, menu data, provider/school discovery, and distance ranking.
-- Order service: order creation, status updates, and pagination.
+## What I implemented
 
-This design prevents one domain from owning unrelated responsibilities and keeps each service easier to reason about.
+- Role-based experiences for parents/customers, providers, schools, and administrators.
+- School and provider directories, menu browsing, and provider-to-school coverage.
+- Location-aware discovery and approximate distance estimates when coordinates are available.
+- Parent ordering, provider order management, order status updates, and date-based order history.
+- Service health endpoints and a local Docker Compose setup using DynamoDB Local.
 
-## Frontend design choices
+I also included a Flask service with a health endpoint and a forecast endpoint that returns fixed example values. The root Docker Compose stack starts the main web application and domain services.
 
-The frontend is intentionally route-based and lightweight. The app renders the most relevant data for each user flow, without making the UI depend on a single giant dataset.
+## How the application is organized
 
-### Why the app is organized this way
+```text
+Browser
+  -> Next.js frontend (port 3000)
+      -> Backend API (port 3001)
+      -> Identity service (port 3002)
+      -> Provider service (port 3003)
+      -> Order service (port 3004)
+          -> DynamoDB (AWS) or DynamoDB Local (development)
+```
 
-- Routes map directly to user intent: home, schools, providers, menu, orders, and registration.
-- Shared UI components such as cards and search widgets are reused across pages.
-- Browser geolocation is used when a user has not set a saved location, so discovery still feels useful before login.
-- Provider and school cards display distance badges only when coordinates are available, creating a clear “near me” signal.
+The root Compose configuration starts the frontend, backend, identity, provider, and order containers, together with DynamoDB Local. The backend provides health and API information routes; identity, provider, and order handle separate areas of the application.
 
-### App logic decisions
+## Cloud and infrastructure skills I used
 
-The homepage prioritizes nearby content in a way that improves the product without breaking search flow:
+- **AWS ECS and Fargate:** I containerized and ran the application services as ECS tasks using Fargate compute.
+- **Amazon ECR:** I built and published container images used by ECS task definitions to private ECR repositories. The Terraform-managed backend repository enables image scanning on push.
+- **Application Load Balancer (ALB):** I routed HTTP traffic through listeners and target groups and used `/health` target-group checks to monitor target availability.
+- **Terraform:** I described AWS infrastructure as code, including VPC and subnet resources, an internet gateway and public routes, security groups, an ALB, ECR, an ECS cluster, IAM roles, a CloudWatch log group, and DynamoDB tables.
+- **Amazon DynamoDB (NoSQL):** I designed table partition keys, sort keys, and Global Secondary Indexes (GSIs) for user, directory, menu, school-coverage, and order queries. I used deterministic sharding for distributed directory and order queries.
+- **AWS IAM and CloudWatch:** I configured ECS execution/task roles and CloudWatch log retention for the backend log group.
 
-- If the user has a saved latitude and longitude, the backend orders providers and schools by nearest distance.
-- If the user is anonymous or has no location, the app uses geolocation when permitted and gracefully falls back to the regular list.
-- Search still works over the already-ranked list, preserving locality while letting the user filter by name or item.
+The Terraform configuration in this repository describes the backend deployment foundation and DynamoDB tables; the deployed frontend and domain services use their own ECS task definitions, services, and target groups. The checked-in GitHub Actions workflow builds and deploys only the backend service. More detail on the infrastructure and DynamoDB design is in my [design and testing report](docs/capstone-design-and-testing.md) and [DynamoDB access patterns](docs/dynamodb-access-patterns.md).
 
-This is intentionally a user-friendly layer on top of the service logic rather than a separate, duplicated ranking mechanism.
+## Run the project locally
 
-## Backend service responsibilities
+Prerequisites: Docker Desktop with Docker Compose and Git.
 
-### Identity service
+From the repository root, start the application:
 
-The identity service is responsible for:
+```bash
+docker compose up --build
+```
 
-- customer, provider, school, and admin account creation
-- login and JWT-based authentication
-- role-aware authorization for protected routes
-- district-aware user validation where required
+Then open [http://localhost:3000](http://localhost:3000). The APIs use local ports 3001–3004, and DynamoDB Local uses port 8000. Compose uses placeholder credentials for local development only; do not use them in a deployed environment.
 
-This keeps identity concerns isolated from provider and order business logic.
+To check service health:
 
-### Provider service
+```bash
+curl http://localhost:3001/health
+curl http://localhost:3002/health
+curl http://localhost:3003/health
+curl http://localhost:3004/health
+```
 
-The provider service owns the domain most tied to discovery and local fulfillment:
+When you are finished, stop the containers:
 
-- provider profiles and registration
-- school coverage and school-to-provider mapping
-- menu metadata and featured content
-- provider/school listing for discovery pages
-- distance calculations using latitude and longitude
+```bash
+docker compose down
+```
 
-The core ranking method uses the Haversine formula to compute the kilometer distance between the user and each provider or school. This is applied only when the user has valid coordinates.
+For more detail, see my [local Docker setup guide](docs/docker-desktop-setup.md) and [.env.example](.env.example). To run a component without Compose, install its dependencies in its package directory and use its `dev` script.
 
-### Order service
+## Tests I ran
 
-The order service handles the transactional flow after a menu item is chosen:
+I ran the existing automated test suites with these commands:
 
-- order submission
-- order status updates
-- payment-related queries when needed
-- safe pagination for order feeds
+```bash
+npm --prefix services/identity-service test
+npm --prefix services/provider-service test
+npm --prefix services/order-service test
+npm --prefix backend test
+```
 
-This keeps ordering logic separate from listings and avoids mixing user discovery state with transactional business rules.
+All 59 tests in those suites passed in my documented run. The [design and testing report](docs/capstone-design-and-testing.md) lists the suites and their coverage.
 
-## Database read/write patterns
+## Project documentation
 
-The project is designed around DynamoDB access patterns rather than ad hoc key lookup behavior.
-
-### Principled read patterns
-
-- Providers are queried by id, district, and owner user id depending on the route.
-- Schools are queried by id, district, and linked provider coverage.
-- Provider-to-school relationships are stored with explicit schoolIds and association lookups.
-- Menu records are stored per provider and queried by providerId.
-
-### Write patterns and consistency
-
-- Provider registrations update provider records and then refresh associated school counts.
-- School coverage updates recalculate providerCount for the affected school.
-- Provider and school records keep location metadata in their own objects so proximity logic can be reused without scanning every row.
-- The app avoids broad list operations where a narrow district or targeted lookup is enough.
-
-### Why this matters
-
-This design lets the app make geographic and listing queries in a bounded, predictable way. It reduces the cost of discovery and gives the team a cleaner path to scale as more practitioners and schools are added to the platform.
-
-## The locality feature
-
-The most important product improvement is the nearest-first ordering strategy.
-
-When the frontend or backend receives valid coordinates, the app computes the distance between the user and each provider or school and sorts results from nearest to farthest. This keeps the experience aligned with the user’s current location and helps families find the closest providers without needing a full search session.
-
-The logic is intentionally simple and transparent:
-
-1. Validate latitude and longitude.
-2. Measure distance in kilometers with the Haversine formula.
-3. Sort with nearest-first ordering.
-4. Keep non-located items as a stable fallback when no coordinates exist.
-
-## Data flow in a normal discovery session
-
-1. A user opens the home page.
-2. The browser checks for saved location data or asks for geolocation permission.
-3. The frontend requests lists for providers and schools with latitude and longitude if available.
-4. The service sorts the records by distance.
-5. The UI renders the nearest results first and highlights them with a distance label.
-6. If the user searches, the ranking is preserved while the search term narrows the visible options.
-
-## Design trade-offs and project constraints
-
-- The app is intentionally simpler than a full geospatial database solution, but it is strong enough for a campus and local delivery MVP.
-- It prioritizes clarity and maintainability over over-engineering.
-- The service boundaries reflect real domain ownership, which makes the app easier to test and extend.
-- The project keeps location logic close to the data that owns it, rather than scattering it across the frontend.
-
-## Current status
-
-The current codebase implements:
-
-- provider and school nearest-first sorting
-- browser geolocation support and saved-location fallback
-- distance badges in the UI
-- bounded service queries with district-aware filtering
-- a clear service split for identity, provider, and order operations
-
-This gives FoodConnect a solid foundation for classroom demonstration, local pilot usage, and further expansion into a fuller food marketplace for Malawi.
+- [Design and testing report](docs/capstone-design-and-testing.md) — architecture, implemented design patterns, and test results.
+- [Architecture decisions and patterns](docs/architecture-decisions-and-patterns.md) — layered services, repositories, DynamoDB design, frontend structure, and cloud deployment patterns.
+- [Implemented API routes](docs/api-contracts.md) — routes registered by the current services.
+- [DynamoDB access patterns](docs/dynamodb-access-patterns.md) — table keys, indexes, and query patterns used by the services.
+- [Architecture patterns](docs/architecture-patterns.md) — patterns used in the application.
+- [Local Docker setup](docs/docker-desktop-setup.md) — instructions for running the application locally.

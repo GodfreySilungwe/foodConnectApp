@@ -1,41 +1,21 @@
-# AI Service
+# AI Example Service
 
-## Purpose
+This Flask service exposes a health check and a sample forecast response. The forecast endpoint returns the fixed example values in `app.py`.
 
-The AI Service provides forecast and recommendation support for food providers based on historical order data.
+## Run with Docker
 
-## Responsibilities
-- analyze historical order data
-- predict demand
-- generate recommendations
-- produce provider summary insight report
+Build and run the image from the repository root:
 
-## Base URL
-
-```text
-http://localhost:5001
+```bash
+docker build -t foodconnect-ai-service ./services/ai-service
+docker run --rm -p 5001:5001 foodconnect-ai-service
 ```
 
-## Health Endpoint
+The service listens on port 5001.
 
-```http
-GET /health
-```
+## Routes
 
-## Example Response
-
-```json
-{
-  "status": "ok",
-  "service": "ai-service"
-}
-```
-
-## API Endpoints
-
-### GET /api/forecast
-Returns sample forecast data for menu items.
-
-## Notes
-
-The AI module uses a lightweight, explainable analytics approach and is intentionally limited to practical demand forecasting for the capstone.
+| Method | Route | Response |
+| --- | --- | --- |
+| `GET` | `/health` | JSON service health status |
+| `GET` | `/api/forecast` | JSON sample forecast for provider `p-001` |

@@ -1,58 +1,46 @@
 # DynamoDB Access Patterns
 
-The v2 tables use on-demand capacity, unique base keys, and deterministic 16-way sharding for user and directory indexes. District is an indexed attribute, not a shared base partition key. This avoids placing every account in a district on one logical partition key.
+The domain services use DynamoDB repositories for user, provider, school, menu, order, and payment records. The root Docker Compose configuration points the services at DynamoDB Local and enables automatic table creation for local development.
 
-## Identity
+## Key design
 
-Table: `foodconnect-<environment>-users-v2`
+The services use multiple purpose-specific NoSQL tables, not a single-table design. Each table's base partition key supports a direct record lookup; secondary-index partition and sort keys support the service's directory and timeline queries. Tables use on-demand (`PAY_PER_REQUEST`) capacity. AWS bills for requests and storage, including secondary-index storage and requests.
 
-- Base key: `id` (unique user ID); account/session/status operations use `GetItem`.
-- Email lock item: `id = EMAIL#<normalized-email>` stores the owning user ID. Login performs a strongly consistent `GetItem` for the lock and then a direct user `GetItem`; registration writes the user and lock atomically, enforcing uniqueness without an eventually consistent GSI.
-- `DistrictRoleIndex`: `gsi1pk = DISTRICT#<district>#ROLE#<role>#SHARD#<0..15>`; `gsi1sk = CREATED#<timestamp>#USER#<id>`.
-- `GlobalUsersIndex`: `gsi2pk = USERS#SHARD#<0..15>`; `gsi2sk = ROLE#<role>#DISTRICT#<district>#USER#<id>`.
+Partition and sort key values are selected for the implemented access patterns: entity ID for direct user/provider/school/menu reads, email lock for account lookup, and composite entity/date/owner values for filtered listings. GSIs project all item attributes (`ProjectionType: ALL`) in the service table definitions. The code derives 16 deterministic shards using the SHA-256 hash of a record ID. The shard is included in applicable GSI partition keys to spread directory and timeline records across partitions. A listing that spans all shards queries each shard and combines the results; sharding therefore distributes writes but adds read fan-out.
 
-Admin account listing requires both a district and a role, and queries all 16 district/role shards. Legacy records without district are indexed under `UNKNOWN` for manual assignment. Registration only accepts Malawi's 28 named districts.
+## Identity records
 
-## Providers, Schools, and Menus
+The v2 users table uses `id` as its base partition key. Email-lock records use `EMAIL#<normalized-email>` as an ID. Registration writes the user and email-lock records transactionally; login resolves the normalized email through its lock record and then loads the user. The following GSIs support user directory queries:
 
-Tables: `providers-v2`, `schools-v2`, and `menus-v2`.
+- `DistrictRoleIndex`: `gsi1pk = DISTRICT#<district>#ROLE#<role>#SHARD#<0..15>` and `gsi1sk = CREATED#<timestamp>#USER#<id>`.
+- `GlobalUsersIndex`: `gsi2pk = USERS#SHARD#<0..15>` and `gsi2sk = ROLE#<role>#DISTRICT#<district>#USER#<id>`.
 
-- Base key: `id` (unique record ID); detail/owner operations use `GetItem` or an owner GSI.
-- `DistrictIndex`: district + entity type + deterministic shard; `gsi1sk` sorts by normalized name and ID.
-- `DirectoryIndex`: entity type + deterministic shard; `gsi2sk` sorts by normalized name and ID.
-- Provider `OwnerIndex`: `OWNER#<userId>`.
-- Provider `SchoolCoverageIndex`: `SCHOOL#<schoolId>#SHARD#<n>` with provider ID as sort key. Membership records are updated when provider school coverage changes, so school details/counts query only associated providers.
-- Menu `ProviderMenuIndex`: `PROVIDER#<providerId>#SHARD#<n>` with menu ID as sort key.
-- `NameIndex`: normalized exact name lookup for school duplicate checks.
+## Providers, schools, and menus
 
-District-scoped admin and directory routes require a valid district. School/provider account creation persists its own district, which may differ from an account owner's district.
+The v2 provider, school, and menu tables use `id` as their base partition key. Their GSIs support the implemented directory and relationship lookups:
 
-## Orders and Payments
+- Provider and school `DistrictIndex`: `gsi1pk` combines district, entity type, and shard; `gsi1sk` sorts records by normalized name and ID.
+- Provider and school `DirectoryIndex`: `gsi2pk` is the entity type and shard; `gsi2sk` sorts by normalized name and ID.
+- Provider `OwnerIndex`: `gsi3pk = OWNER#<userId>` and `gsi3sk = PROVIDER#<providerId>`.
+- Provider `SchoolCoverageIndex`: `gsi4pk = SCHOOL#<schoolId>#SHARD#<n>` and `gsi4sk = PROVIDER#<providerId>`. Provider coverage changes maintain separate relationship records.
+- Menu `ProviderMenuIndex`: `gsi1pk = PROVIDER#<providerId>#SHARD#<n>` and `gsi1sk` identifies the menu item.
+- School `NameIndex`: `gsi5pk = NAME#<normalized-name>` and `gsi5sk` contains district and school ID.
 
-Tables: `orders-v2` and `payments-v2`.
+## Orders
 
-Orders use `pk = ORDER#<orderId>`, `sk = META`; GSI indexes support:
+The v2 orders table uses `pk = ORDER#<orderId>` as its partition key and `sk = META` as its sort key. A deterministic SHA-256-derived shard is included in each GSI partition key:
 
-- `KitchenDateIndex`: kitchen + service date + shard, sorted by `serviceAt`.
-- `KitchenTimelineIndex`: kitchen + shard, sorted by `serviceAt`.
-- `CustomerTimelineIndex`: customer + shard, sorted by `serviceAt`.
-- `GlobalTimelineIndex`: global + shard, sorted by `serviceAt` for bounded admin reports.
+- `KitchenDateIndex`: `gsi1pk` combines provider, service date, and shard; `gsi1sk` sorts by service timestamp and order ID.
+- `KitchenTimelineIndex`: `gsi2pk` combines provider and shard; `gsi2sk` sorts by service timestamp and order ID.
+- `CustomerTimelineIndex`: `gsi3pk` combines customer and shard; `gsi3sk` sorts by service timestamp and order ID.
+- `GlobalTimelineIndex`: `gsi4pk` combines the global order group and shard; `gsi4sk` sorts by service timestamp and order ID.
 
-Payments use `pk = PAYMENT#<paymentId>`, `sk = META`, with kitchen/date shards, a kitchen timeline, and order-ID lookup. The repository exposes payment reads/writes, but this application has no payment processor/settlement writer yet; payment rows must only be written after a verified settlement event.
+Order and provider payment list routes support date-based or bounded date-range filters. The order service validates date ranges, including a maximum 31-day window.
 
-Order and payment date queries require a date or a bounded `from`/`to` range (maximum 31 days). Per-request table descriptions are cached, and missing tables are auto-created only when `DYNAMODB_AUTO_CREATE_TABLES=true`; production should provision tables with Terraform.
+## Payments
 
-## Migration
+The v2 payments table uses `pk = PAYMENT#<paymentId>` as its partition key and `sk = META` as its sort key. `KitchenDateIndex` and `KitchenTimelineIndex` support provider/date and provider timeline queries; `OrderPaymentsIndex` supports lookup by order ID. The order service exposes authenticated provider routes to query payment records.
 
-Terraform creates new v2 tables with on-demand capacity, deletion protection, point-in-time recovery, and matching indexes. Existing tables are left untouched because DynamoDB primary keys cannot be changed in place.
+## Table provisioning and protection
 
-The migration utility is a one-time operation. It scans v1 tables, derives v2 keys, copies records in batches of 25, retries unprocessed writes, and never deletes source records. Orders without a trustworthy `scheduledFor`, `serviceAt`, or `createdAt` are reported and left in v1 rather than assigned a fabricated date.
-
-1. Review this design and back up/export the source tables.
-2. Apply Terraform to provision the v2 tables and wait for all GSIs to become active.
-3. Set `LEGACY_*_TABLE` variables if the old table names differ from defaults.
-4. Run `node services/order-service/migrate-v2.js` for a dry-run count review. For large production tables, use DynamoDB point-in-time export to S3 and an offline transform instead of an online Scan.
-5. Run with `--apply` only after reviewing counts and data treatment. Verify representative user/email, district, provider/school, menu, and order reads.
-6. Deploy services configured to use the v2 table names. Keep v1 tables until reconciliation and rollback windows have passed.
-
-The migration utility is the only intended scan path; normal service requests must use `GetItem` or indexed `Query` operations.
+Terraform in `infrastructure/terraform/main.tf` defines the DynamoDB tables, indexes, on-demand billing, deletion protection, and point-in-time recovery settings for v2 tables. The services create missing tables only when `DYNAMODB_AUTO_CREATE_TABLES=true`; the root Docker Compose file enables this setting for local development.

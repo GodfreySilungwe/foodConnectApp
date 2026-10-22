@@ -1,314 +1,80 @@
-# Service API Contracts
+# Implemented API Routes
 
-This document defines the contract structure for the Sprint 2 and subsequent sprint implementation. The design follows a lightweight, practical approach suitable for an individual or small team capstone.
+This document lists routes registered by the current services. For exact request validation and response fields, see the route handlers and automated tests.
 
-## Identity Service
+Local base URLs are configured in `docker-compose.yml`:
 
-### Base URL
-`http://localhost:3002`
+| Service | Base URL |
+| --- | --- |
+| Backend API | `http://localhost:3001` |
+| Identity | `http://localhost:3002` |
+| Provider and school | `http://localhost:3003` |
+| Order | `http://localhost:3004` |
 
-### Endpoints
+The backend API and each Node.js domain service expose `GET /health`. The backend also exposes `GET /api`.
 
-#### POST /api/auth/register
-Request body:
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "SecurePass123!",
-  "role": "customer"
-}
-```
+## Identity service
 
-Supported self-registration roles are `customer` (parent/guardian), `provider`, and `school` (school administrator).
+| Method | Route | Access |
+| --- | --- | --- |
+| `POST` | `/api/auth/register` | Public; supported self-registration roles are customer, provider, and school. |
+| `POST` | `/api/auth/login` | Public |
+| `GET` | `/api/auth/session` | Authenticated user |
+| `GET` | `/api/users` | Admin |
+| `GET` | `/api/admin/users` | Admin or super-admin |
+| `GET` | `/api/admin/users/:userId` | Admin or super-admin |
+| `PATCH` | `/api/admin/users/:userId/status` | Super-admin |
 
-Response:
-```json
-{
-  "userId": "u-001",
-  "name": "John Doe",
-  "email": "john@example.com",
-  "role": "customer"
-}
-```
+## Provider and school service
 
-#### POST /api/auth/login
-Request body:
-```json
-{
-  "email": "john@example.com",
-  "password": "SecurePass123!"
-}
-```
+| Method | Route | Access |
+| --- | --- | --- |
+| `GET` | `/api/providers` | Public |
+| `GET` | `/api/providers/:providerId` | Public |
+| `GET` | `/api/providers/:providerId/image` | Public |
+| `GET` | `/api/providers/:providerId/menu` | Public |
+| `GET` | `/api/menu/featured` | Public |
+| `GET` | `/api/menu/:menuId/images/:imageIndex` | Public |
+| `GET` | `/api/schools` | Public |
+| `GET` | `/api/schools/:schoolId` | Public |
+| `GET` | `/api/schools/:schoolId/image` | Public |
+| `GET` | `/api/schools/:schoolId/providers` | Public |
+| `POST` | `/api/providers` | Provider |
+| `PUT` | `/api/providers/:providerId/profile` | Provider; owning provider |
+| `PUT` | `/api/providers/:providerId/schools` | Provider; owning provider |
+| `POST` | `/api/providers/:providerId/menu` | Provider; owning provider |
+| `PUT` | `/api/providers/:providerId/menu/:menuId` | Provider; owning provider |
+| `PUT` | `/api/providers/:providerId/menu/:menuId/availability` | Provider; owning provider |
+| `GET` | `/api/my/menu` | Provider |
+| `POST` | `/api/providers/:providerId/ratings` | Customer |
+| `POST` | `/api/schools` | Authenticated school, provider, admin, or super-admin |
+| `PUT` | `/api/schools/:schoolId` | Authenticated school, provider, admin, or super-admin; non-admin users must own the school record |
+| `GET` | `/api/admin/providers` | Admin or super-admin |
+| `GET` | `/api/admin/schools` | Super-admin |
+| `PATCH` | `/api/admin/providers/:providerId/status` | Super-admin |
+| `PATCH` | `/api/admin/schools/:schoolId/status` | Super-admin |
 
-Response:
-```json
-{
-  "token": "jwt-token",
-  "user": {
-    "userId": "u-001",
-    "role": "customer"
-  }
-}
-```
+Directory routes accept filters implemented by the handlers, including district and coordinates where supported.
 
-#### GET /api/users/:userId
-Response:
-```json
-{
-  "userId": "u-001",
-  "name": "John Doe",
-  "email": "john@example.com",
-  "role": "customer"
-}
-```
+## Order service
 
-#### GET /api/admin/users
+| Method | Route | Access |
+| --- | --- | --- |
+| `POST` | `/api/orders` | Customer |
+| `GET` | `/api/orders` | Authenticated customer, provider, or administrator; results are scoped by role and authenticated identity |
+| `PATCH` | `/api/orders/:orderId/status` | Provider; authorized for the owning provider |
+| `GET` | `/api/payments` | Provider |
+| `GET` | `/api/orders/:orderId/payments` | Provider |
 
-Requires an admin JWT. Returns user profiles without password hashes.
+Order and payment list filters support the date/range and pagination parameters handled by the service. The service validates date ranges and limits their maximum width. Customer and provider order results are scoped using authenticated account claims, not caller-supplied owner IDs.
 
----
+## AI example service
 
-## Provider Service
+The Flask service in `services/ai-service` exposes:
 
-### Base URL
-`http://localhost:3003`
+| Method | Route | Access |
+| --- | --- | --- |
+| `GET` | `/health` | Public |
+| `GET` | `/api/forecast` | Public |
 
-#### GET /api/schools
-Returns registered schools for parent checkout and discovery.
-
-#### POST /api/schools
-Requires a school administrator JWT. Request body:
-```json
-{
-  "name": "Northside Primary",
-  "location": "North District",
-  "studentCount": 450
-}
-```
-
-### Endpoints
-
-#### POST /api/providers
-Requires a provider JWT. `schoolIds` contains the registered schools served by this provider.
-
-Request body:
-```json
-{
-  "name": "Sunrise Kitchen",
-  "ownerName": "Alice",
-  "email": "sunrise@example.com",
-  "status": "active",
-  "schoolIds": ["s-001"]
-}
-```
-
-Response:
-```json
-{
-  "providerId": "p-001",
-  "name": "Sunrise Kitchen",
-  "status": "active"
-}
-```
-
-#### GET /api/providers/:providerId
-Response:
-```json
-{
-  "providerId": "p-001",
-  "name": "Sunrise Kitchen",
-  "status": "active",
-  "menuCount": 7
-}
-```
-
-#### PUT /api/providers/:providerId/schools
-Requires the owning provider JWT. Replaces the provider's school coverage:
-```json
-{
-  "schoolIds": ["s-001"]
-}
-```
-
-#### POST /api/providers/:providerId/menu
-Request body:
-```json
-{
-  "menuId": "m-101",
-  "name": "Chicken Rice",
-  "price": 22.5,
-  "available": true
-}
-```
-
-Response:
-```json
-{
-  "menuId": "m-101",
-  "providerId": "p-001",
-  "name": "Chicken Rice",
-  "price": 22.5,
-  "available": true
-}
-```
-
----
-
-## Order Service
-
-### View Incoming Orders
-
-`GET /api/orders?providerId=me`
-
-Requires a provider JWT. The service ignores caller-supplied provider IDs and filters by the provider ID embedded in the verified token.
-
-### Update Order Status
-
-`PATCH /api/orders/{orderId}/status`
-
-Request body:
-
-```json
-{
-  "status": "accepted"
-}
-```
-
-Allowed transitions are `pending -> accepted|cancelled`, `accepted -> preparing|cancelled`, `preparing -> ready`, and `ready -> completed`.
-
-### Base URL
-`http://localhost:3004`
-
-### Endpoints
-
-#### POST /api/orders
-Request body:
-```json
-{
-  "customerId": "u-001",
-  "providerId": "p-001",
-  "items": [
-    {
-      "menuId": "m-101",
-      "quantity": 2
-    }
-  ],
-  "studentName": "Taylor Doe",
-  "studentClass": "Year 4",
-  "schoolId": "s-001",
-  "schoolName": "FoodConnect Central Campus",
-  "foodPreferences": "No peanuts; mild spice",
-  "scheduledFor": "2026-09-10T13:00:00Z",
-  "deliveryType": "delivery"
-}
-```
-
-Response:
-```json
-{
-  "orderId": "o-1001",
-  "status": "pending",
-  "total": 45.0
-}
-```
-
-#### GET /api/orders/:orderId
-Response:
-```json
-{
-  "orderId": "o-1001",
-  "customerId": "u-001",
-  "providerId": "p-001",
-  "status": "pending",
-  "deliveryType": "delivery",
-  "total": 45.0
-}
-```
-
-#### PATCH /api/orders/:orderId/status
-Request body:
-```json
-{
-  "status": "accepted"
-}
-```
-
-Response:
-```json
-{
-  "orderId": "o-1001",
-  "status": "accepted"
-}
-```
-
----
-
-## AI Service
-
-### Base URL
-`http://localhost:5001`
-
-### Endpoints
-
-#### GET /api/forecast
-Response:
-```json
-{
-  "providerId": "p-001",
-  "forecast": [
-    {
-      "item": "Chicken Rice",
-      "predictedDemand": 84
-    },
-    {
-      "item": "Beef Burger",
-      "predictedDemand": 48
-    }
-  ]
-}
-```
-
-#### GET /api/insights/report
-Response:
-```json
-{
-  "providerId": "p-001",
-  "report": {
-    "topItems": ["Chicken Rice", "Beef Burger"],
-    "demandSummary": "Demand is trending upward for chicken-based meals",
-    "recommendation": "Increase preparation quantity for Chicken Rice by 15%"
-  }
-}
-```
-
----
-
-## Shared Response Pattern
-
-Use a consistent response contract:
-
-```json
-{
-  "success": true,
-  "data": {},
-  "message": "Operation completed successfully"
-}
-```
-
-Error responses should follow:
-
-```json
-{
-  "success": false,
-  "error": "Validation failed",
-  "details": []
-}
-```
-
-## Notes
-
-- Keep payloads simple for Sprint 2.
-- Validate request bodies before processing.
-- Use consistent naming for providerId, orderId, and menuId.
-- This structure provides a practical contract for the capstone without overengineering.
+`GET /api/forecast` returns a fixed sample forecast for provider `p-001`.
